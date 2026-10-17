@@ -1,10 +1,10 @@
 import { TemplateConfig } from '../types';
 
-// Physical Calibrated Lines for Sandip University A4 Assignment Sheet (210 x 297 mm)
+// Physical Calibrated Lines for Standard A4 Assignment Sheet (210 x 297 mm)
 // Measured directly from 300 DPI flatbed optical scan (2480 x 3507 px).
 // Writing Line 1 begins at 46.83mm (cleanly below header text and double rule).
 // Line pitch is exactly 7.30mm across 33 writing lines ending at 280.66mm.
-export const DEFAULT_SANDIP_LINES_MM = [
+export const DEFAULT_RULED_LINES_MM = [
   46.83, 54.2, 61.48, 68.85, 76.22, 83.5, 90.79, 98.15, 105.52, 112.8,
   120.17, 127.46, 134.74, 142.11, 149.39, 156.76, 163.96, 171.32, 178.61, 185.89,
   193.17, 200.46, 207.82, 215.11, 222.39, 229.67, 236.96, 244.32, 251.52, 258.81,
@@ -12,8 +12,8 @@ export const DEFAULT_SANDIP_LINES_MM = [
 ];
 
 export const DEFAULT_TEMPLATE: TemplateConfig = {
-  id: 'sandip-university-default',
-  name: 'Sandip University Assignment Sheet',
+  id: 'standard-ruled-default',
+  name: 'Standard Ruled Assignment Sheet',
   imageUrl: '/default_template.jpg',
   paperSize: 'A4',
   pageWidthMm: 210.0,
@@ -26,7 +26,7 @@ export const DEFAULT_TEMPLATE: TemplateConfig = {
     indexLineXMm: 29.13, // Double vertical margin rule position
     marginLabelXMm: 19.5 // Left margin placement for Q.1, Ans., etc.
   },
-  linesMm: [...DEFAULT_SANDIP_LINES_MM],
+  linesMm: [...DEFAULT_RULED_LINES_MM],
   baselineOffsetMm: 0.0, // Text baseline sits flush directly on the physical ruled lines
   rotationDeg: 0,
   isDefault: true
@@ -40,6 +40,11 @@ export function loadSavedTemplate(): TemplateConfig {
     if (saved) {
       const parsed = JSON.parse(saved);
       if (parsed && Array.isArray(parsed.linesMm) && parsed.linesMm.length === 33) {
+        if (parsed.isDefault && parsed.name !== 'Standard Ruled Assignment Sheet') {
+          parsed.name = 'Standard Ruled Assignment Sheet';
+          parsed.id = 'standard-ruled-default';
+          saveTemplate(parsed);
+        }
         return parsed;
       }
     }
@@ -64,7 +69,7 @@ export function resetTemplateToDefault(): TemplateConfig {
   const reset = {
     ...DEFAULT_TEMPLATE,
     baselineOffsetMm: 0.0,
-    linesMm: [...DEFAULT_SANDIP_LINES_MM],
+    linesMm: [...DEFAULT_RULED_LINES_MM],
     writingArea: {
       ...DEFAULT_TEMPLATE.writingArea,
       firstLineYMm: 46.83,

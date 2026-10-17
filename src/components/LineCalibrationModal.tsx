@@ -1,7 +1,7 @@
 import React, { useState, useRef } from 'react';
 import { TemplateConfig } from '../types';
 import { detectRuledLinesFromImage } from '../utils/lineDetector';
-import { DEFAULT_SANDIP_LINES_MM, DEFAULT_TEMPLATE } from '../utils/defaultTemplate';
+import { DEFAULT_RULED_LINES_MM, DEFAULT_TEMPLATE } from '../utils/defaultTemplate';
 import {
   X,
   Wand2,
@@ -81,10 +81,10 @@ export const LineCalibrationModal: React.FC<Props> = ({ template, onSave, onClos
     setShowSpacingGenerator(false);
   };
 
-  // Reset to default Sandip calibration
+  // Reset to default calibration
   const handleResetDefault = () => {
-    if (confirm('Reset lines and margins to default Sandip University calibration?')) {
-      setLines([...DEFAULT_SANDIP_LINES_MM]);
+    if (confirm('Reset lines and margins to default calibration?')) {
+      setLines([...DEFAULT_RULED_LINES_MM]);
       setLeftMarginMm(DEFAULT_TEMPLATE.writingArea.leftMarginMm);
       setRightMarginMm(DEFAULT_TEMPLATE.writingArea.rightMarginMm);
       setBaselineOffsetMm(DEFAULT_TEMPLATE.baselineOffsetMm);
@@ -539,7 +539,7 @@ export const LineCalibrationModal: React.FC<Props> = ({ template, onSave, onClos
           <div>
             Format: <strong style={{ color: '#ffffff' }}>{paperSize} ({pageWidthMm} &times; {pageHeightMm} mm)</strong> &bull; Writing Width: <strong style={{ color: '#ffffff' }}>{Math.round((rightMarginMm - leftMarginMm) * 10) / 10} mm</strong>
           </div>
-          <div>100% Offline Pixel Processing &bull; Calibrated for Sandip University</div>
+          <div>100% Offline Pixel Processing &bull; Calibrated for Standard Ruled Sheets</div>
         </div>
 
       </div>

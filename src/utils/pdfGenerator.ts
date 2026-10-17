@@ -285,7 +285,7 @@ export async function generateAlignmentTestPdf(
   const leftXPt = template.writingArea.leftMarginMm * MM_TO_PT;
 
   // Header guide line (small text in margin indicating test sheet)
-  page.drawText('--- SANDIP UNIVERSITY A4 PRINT CALIBRATION TEST (Set Printer Scale to 100% / Actual Size) ---', {
+  page.drawText('--- STANDARD A4 PRINT CALIBRATION TEST (Set Printer Scale to 100% / Actual Size) ---', {
     x: leftXPt,
     y: (template.pageHeightMm - 20) * MM_TO_PT,
     size: 7,

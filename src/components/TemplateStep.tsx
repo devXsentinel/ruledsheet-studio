@@ -53,7 +53,7 @@ export const TemplateStep: React.FC<Props> = ({
         </span>
         <h1 className="step-hero-title">Ruled Page Template</h1>
         <p className="step-hero-desc">
-          Your text will align directly onto this sheet&apos;s pre-printed horizontal rules. The default <strong>Sandip University sheet</strong> is pre-calibrated with 33 writing lines, double vertical margin, and A4 paper size.
+          Your text will align directly onto this sheet&apos;s pre-printed horizontal rules. The default <strong>ruled sheet</strong> is pre-calibrated with 33 writing lines, double vertical margin, and A4 paper size.
         </p>
       </div>
 
@@ -121,7 +121,7 @@ export const TemplateStep: React.FC<Props> = ({
               {template.isDefault && (
                 <span className="pill-badge pill-badge-green">
                   <CheckCircle2 size={12} />
-                  Default Sandip Sheet
+                  Default Ruled Sheet
                 </span>
               )}
             </div>
@@ -176,7 +176,7 @@ export const TemplateStep: React.FC<Props> = ({
               <input type="file" ref={fileInputRef} onChange={handleCustomImageUpload} accept="image/*" style={{ display: 'none' }} />
 
               {!template.isDefault && (
-                <button onClick={onResetTemplate} className="btn btn-secondary" title="Reset to default Sandip template">
+                <button onClick={onResetTemplate} className="btn btn-secondary" title="Reset to default template">
                   <RotateCcw size={16} />
                 </button>
               )}

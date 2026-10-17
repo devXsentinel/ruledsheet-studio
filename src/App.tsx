@@ -1,4 +1,4 @@
-﻿import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo } from 'react';
 import {
   TemplateConfig,
   DocumentBlock,
@@ -30,15 +30,15 @@ import {
 } from 'lucide-react';
 
 export const App: React.FC = () => {
-  // 1. Template State (loaded from localStorage or default Sandip sheet)
+  // 1. Template State (loaded from localStorage or default ruled sheet)
   const [template, setTemplate] = useState<TemplateConfig>(() => loadSavedTemplate());
   const [isCalibrationOpen, setIsCalibrationOpen] = useState(false);
 
-  // 2. Document Blocks State (pre-populated with realistic Sandip assignment sample)
+  // 2. Document Blocks State (pre-populated with realistic assignment sample)
   const initialBlocks = useMemo(() => parsePlainText(SAMPLE_ASSIGNMENT_TEXT), []);
   const [blocks, setBlocks] = useState<DocumentBlock[]>(initialBlocks);
   const [summary, setSummary] = useState<DocxImportSummary | null>({
-    fileName: 'Sandip_Assignment_Sample.docx',
+    fileName: 'Assignment_Sample.docx',
     fileSizeBytes: 18450,
     paragraphCount: initialBlocks.length,
     wordCount: initialBlocks.reduce((acc, b) => acc + b.text.split(/\s+/).filter(Boolean).length, 0),
@@ -91,10 +91,10 @@ export const App: React.FC = () => {
 
   return (
     <div className="app-container">
-      
+
       {/* Top Application Header */}
       <header className="app-navbar">
-        
+
         {/* Brand */}
         <div className="nav-brand">
           <div className="nav-logo-icon">
@@ -106,7 +106,7 @@ export const App: React.FC = () => {
                 RuledSheet<span>Studio</span>
               </span>
               <span className="nav-badge hide-on-mobile">
-                Sandip Univ &bull; A4
+                &bull; A4
               </span>
             </div>
             <div className="hide-on-mobile" style={{ fontSize: '0.6875rem', color: 'var(--text-muted)' }}>

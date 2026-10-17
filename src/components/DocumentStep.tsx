@@ -56,7 +56,7 @@ export const DocumentStep: React.FC<Props> = ({
     const sampleBlocks = parsePlainText(SAMPLE_ASSIGNMENT_TEXT);
     const wordCount = sampleBlocks.reduce((acc, b) => acc + b.text.split(/\s+/).filter(Boolean).length, 0);
     const sampleSummary: DocxImportSummary = {
-      fileName: 'Sandip_Assignment_Sample.docx',
+      fileName: 'Assignment_Sample.docx',
       fileSizeBytes: 18450,
       paragraphCount: sampleBlocks.length,
       wordCount,
@@ -169,7 +169,7 @@ export const DocumentStep: React.FC<Props> = ({
               style={{ color: '#60a5fa' }}
             >
               <FileCode size={15} />
-              Load Sample Sandip Assignment Text
+              Load Sample Assignment Text
             </button>
           </div>
         </div>

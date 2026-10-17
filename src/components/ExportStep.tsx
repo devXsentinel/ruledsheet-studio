@@ -101,7 +101,7 @@ export const ExportStep: React.FC<Props> = ({
         </span>
         <h1 className="step-hero-title">Download Assignment PDFs</h1>
         <p className="step-hero-desc">
-          Both PDF variants share the <strong>exact same frozen layout</strong> and physical coordinates. Calibrated for Sandip University A4 pre-printed ruled sheets.
+          Both PDF variants share the <strong>exact same frozen layout</strong> and physical coordinates. Calibrated for standard A4 pre-printed ruled sheets.
         </p>
       </div>
 
@@ -133,7 +133,7 @@ export const ExportStep: React.FC<Props> = ({
         </div>
 
         <div style={{ fontSize: '0.8125rem', color: '#fecaca', lineHeight: 1.6 }}>
-          When printing the <strong>Text Only PDF</strong> onto your physical Sandip University ruled sheets, your printer driver MUST NOT scale or resize the document:
+          When printing the <strong>Text Only PDF</strong> onto your physical ruled sheets, your printer driver MUST NOT scale or resize the document:
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(230px, 1fr))', gap: '0.75rem', marginTop: '0.65rem' }}>
             <div style={{ background: 'rgba(0, 0, 0, 0.35)', padding: '0.65rem 0.85rem', borderRadius: 'var(--radius-md)', border: '1px solid rgba(239, 68, 68, 0.25)' }}>
               <div style={{ color: '#ef4444', fontWeight: 800, fontSize: '0.75rem', marginBottom: '0.2rem' }}>1. PRINT SCALE SETTING</div>
@@ -233,7 +233,7 @@ export const ExportStep: React.FC<Props> = ({
               </li>
               <li>
                 <CheckCircle2 size={16} color="#10b981" />
-                <span>Feeds into printer with real pre-printed Sandip sheets</span>
+                <span>Feeds into printer with real pre-printed ruled sheets</span>
               </li>
               <li>
                 <CheckCircle2 size={16} color="#10b981" />
@@ -272,7 +272,7 @@ export const ExportStep: React.FC<Props> = ({
             <div>
               <h2 className="export-card-title">Export Preview PDF (With Sheet)</h2>
               <p className="export-card-desc">
-                Renders handwritten text directly onto the <strong>calibrated Sandip University template</strong>. Ideal for online classroom submission or verification.
+                Renders handwritten text directly onto the <strong>calibrated ruled paper template</strong>. Ideal for online classroom submission or verification.
               </p>
             </div>
 

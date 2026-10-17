@@ -209,7 +209,7 @@ export function parsePlainText(raw: string): DocumentBlock[] {
 }
 
 /**
- * Built-in Sandip University realistic sample assignment text for instant testing
+ * Built-in realistic sample assignment text for instant testing
  */
 export const SAMPLE_ASSIGNMENT_TEXT = `Q.1 Explain the difference between Microprocessor and Microcontroller with suitable examples.
 Ans. A Microprocessor contains only the central processing unit (CPU) on a single integrated chip, requiring external memory (RAM, ROM) and I/O ports to function as a complete system (e.g., Intel Core i7, 8085). In contrast, a Microcontroller integrates a CPU, memory, timers, and I/O peripherals onto a single chip, making it ideal for dedicated embedded control systems (e.g., Arduino ATmega328, 8051).
