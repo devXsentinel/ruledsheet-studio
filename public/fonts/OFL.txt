@@ -1,0 +1,22 @@
+Font Licenses and Notices
+==========================
+
+The following open-source fonts are bundled locally with this application:
+
+1. Caveat
+   - Author: Pablo Impallari
+   - License: SIL Open Font License, Version 1.1 (OFL-1.1)
+   - Source: https://github.com/googlefonts/caveat
+
+2. Kalam
+   - Author: Indian Type Foundry
+   - License: SIL Open Font License, Version 1.1 (OFL-1.1)
+   - Source: https://github.com/itfoundry/kalam
+
+3. Patrick Hand
+   - Author: Patrick Wagesreiter
+   - License: SIL Open Font License, Version 1.1 (OFL-1.1)
+   - Source: https://github.com/googlefonts/patrick-hand
+
+These fonts are distributed under the terms of the SIL Open Font License, Version 1.1.
+They are freely usable, redistributable, and embeddable.
