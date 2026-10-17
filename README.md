@@ -113,8 +113,7 @@ When printing the **Text-Only PDF** onto physical university ruled notebook pape
 ruledsheet-studio/
 ├── public/
 │   ├── default_template.jpg    # High-resolution scanned university ruled sheet
-│   ├── fonts/                  # Embedded handwriting TrueType fonts for PDF-Lib
-│   └── _redirects              # Cloudflare Pages SPA client-side routing rule
+│   └── fonts/                  # Embedded handwriting TrueType fonts for PDF-Lib
 ├── src/
 │   ├── components/
 │   │   ├── DocumentStep.tsx    # Word (.docx) upload, drag-and-drop & parsing
@@ -137,7 +136,8 @@ ruledsheet-studio/
 ├── index.html                  # SEO meta tags, OpenGraph, JSON-LD schema & fonts
 ├── package.json
 ├── tsconfig.json
-└── vite.config.ts
+├── vite.config.ts
+└── wrangler.jsonc              # Cloudflare Workers Static Assets configuration
 ```
 
 ---
