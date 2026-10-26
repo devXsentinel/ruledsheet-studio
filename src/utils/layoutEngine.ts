@@ -1,4 +1,14 @@
-﻿import { DocumentBlock, TemplateConfig, HandwritingSettings, LayoutLine, LayoutPage, LayoutResult } from '../types';
+import {
+  DocumentBlock,
+  TemplateConfig,
+  HandwritingSettings,
+  LayoutLine,
+  LayoutPage,
+  LayoutResult,
+  LayoutTable,
+  LayoutTableCell,
+  LayoutTableGridLine
+} from '../types';
 import { extractMarginPrefix } from './docxParser';
 
 // Standard conversion factor: 1 mm = 72 / 25.4 points
@@ -87,7 +97,7 @@ export function wrapText(
 
 /**
  * Single source of truth for the document layout.
- * Places text onto ruled lines across pages, calculating exact physical mm and pt coordinates.
+ * Places text and tables onto ruled lines across pages, calculating exact physical mm and pt coordinates.
  */
 export function computeLayout(
   blocks: DocumentBlock[],
@@ -113,6 +123,7 @@ export function computeLayout(
   let currentPageIndex = 0;
   let currentLineIndex = 0;
   let pageLines: LayoutLine[] = [];
+  let pageTables: LayoutTable[] = [];
   let totalLinesCount = 0;
   let globalLineSeed = 42;
 
@@ -120,16 +131,21 @@ export function computeLayout(
     while (pages.length <= currentPageIndex) {
       pages.push({
         pageIndex: pages.length,
-        lines: []
+        lines: [],
+        tables: []
       });
     }
   }
 
   function advanceToNextPage() {
+    ensurePage();
     if (pageLines.length > 0) {
-      ensurePage();
       pages[currentPageIndex].lines = [...pageLines];
       pageLines = [];
+    }
+    if (pageTables.length > 0) {
+      pages[currentPageIndex].tables = [...pageTables];
+      pageTables = [];
     }
     currentPageIndex++;
     currentLineIndex = 0;
@@ -137,10 +153,10 @@ export function computeLayout(
 
   for (let bIndex = 0; bIndex < blocks.length; bIndex++) {
     const block = blocks[bIndex];
-    if ((!block.text || block.text.trim().length === 0) && !block.marginPrefix) continue;
+    if ((!block.text || block.text.trim().length === 0) && !block.marginPrefix && !block.tableData) continue;
 
     // 1. Force Page Break: if block has pageBreakBefore and we are not already at the clean top of a blank page
-    if (block.pageBreakBefore && (currentLineIndex > 0 || (currentPageIndex === 0 && pageLines.length > 0))) {
+    if (block.pageBreakBefore && (currentLineIndex > 0 || (currentPageIndex === 0 && (pageLines.length > 0 || pageTables.length > 0)))) {
       advanceToNextPage();
     }
 
@@ -161,7 +177,215 @@ export function computeLayout(
       currentLineIndex += 1;
     }
 
-    // 3. Orphan prevention: if block is heading or question with <= 1 line left before page ends,
+    // 3. TABLE BLOCK LAYOUT ON RULED LINES
+    if (block.type === 'table' && block.tableData && block.tableData.rows.length > 0) {
+      // Natural 1-line gap before table if not at top of page
+      if (currentLineIndex > 0 && currentLineIndex < linesMm.length - 2) {
+        currentLineIndex += 1;
+      }
+
+      const blockIndentMm = block.indentMm || 0;
+      const tableLeftX = template.writingArea.leftMarginMm + blockIndentMm;
+      const tableRightX = effectiveRightMarginMm;
+      const tableWidth = Math.max(30, tableRightX - tableLeftX);
+      const numCols = Math.max(1, ...block.tableData.rows.map(r => r.cells.length));
+
+      // Calculate column widths
+      const colWidths: number[] = [];
+      if (block.tableData.colWidthsRatio && block.tableData.colWidthsRatio.length === numCols) {
+        const sumRatio = block.tableData.colWidthsRatio.reduce((a, b) => a + b, 0);
+        for (let c = 0; c < numCols; c++) {
+          colWidths.push((block.tableData.colWidthsRatio[c] / sumRatio) * tableWidth);
+        }
+      } else {
+        for (let c = 0; c < numCols; c++) {
+          colWidths.push(tableWidth / numCols);
+        }
+      }
+
+      // Column start X coordinates
+      const colStarts: number[] = [];
+      let colX = tableLeftX;
+      for (let c = 0; c < numCols; c++) {
+        colStarts.push(colX);
+        colX += colWidths[c];
+      }
+
+      const tableFontSizePt = block.fontSizePt || (settings.fontSizePt > 13 ? settings.fontSizePt - 2.5 : settings.fontSizePt);
+      const cellPaddingX = 2.0;
+      const defaultPitchMm = linesMm.length > 1 ? (linesMm[linesMm.length - 1] - linesMm[0]) / (linesMm.length - 1) : 7.3;
+
+      // Base stroke thickness for table lines (default bold 1.8pt, outer 2.1pt)
+      const baseBorderWidthPt = block.tableData.borderWidthPt || 1.8;
+      const outerBorderWidthPt = Math.round((baseBorderWidthPt + 0.3) * 10) / 10;
+      const headerBorderWidthPt = Math.round((baseBorderWidthPt + 0.2) * 10) / 10;
+      const dividerBorderWidthPt = baseBorderWidthPt;
+
+      const gridColor = block.tableData.borderColor || (settings.smartQaColors ? '#1e3a8a' : (block.colorOverride || settings.normalColor || '#1e3a8a'));
+
+      let activeTableOnPage: LayoutTable | null = null;
+      let tablePageTopY = 0;
+      let lastRowBottomY = 0;
+
+      // Ensure space for at least 1 row on current page; otherwise advance to fresh page
+      if (currentLineIndex + 2 >= linesMm.length) {
+        advanceToNextPage();
+      }
+
+      const finishTableOnPage = () => {
+        if (!activeTableOnPage) return;
+        activeTableOnPage.heightMm = Math.round((lastRowBottomY - tablePageTopY) * 100) / 100;
+
+        // Top border (placed directly on ruled line tablePageTopY)
+        activeTableOnPage.gridLines.unshift({
+          x1Mm: tableLeftX,
+          y1Mm: Math.round(tablePageTopY * 100) / 100,
+          x2Mm: tableRightX,
+          y2Mm: Math.round(tablePageTopY * 100) / 100,
+          strokeWidthPt: outerBorderWidthPt,
+          color: gridColor
+        });
+
+        // Vertical boundaries (Left outer, Right outer)
+        activeTableOnPage.gridLines.push({
+          x1Mm: tableLeftX,
+          y1Mm: Math.round(tablePageTopY * 100) / 100,
+          x2Mm: tableLeftX,
+          y2Mm: Math.round(lastRowBottomY * 100) / 100,
+          strokeWidthPt: outerBorderWidthPt,
+          color: gridColor
+        });
+        activeTableOnPage.gridLines.push({
+          x1Mm: tableRightX,
+          y1Mm: Math.round(tablePageTopY * 100) / 100,
+          x2Mm: tableRightX,
+          y2Mm: Math.round(lastRowBottomY * 100) / 100,
+          strokeWidthPt: outerBorderWidthPt,
+          color: gridColor
+        });
+
+        // Vertical column dividers
+        for (let c = 1; c < numCols; c++) {
+          activeTableOnPage.gridLines.push({
+            x1Mm: Math.round(colStarts[c] * 100) / 100,
+            y1Mm: Math.round(tablePageTopY * 100) / 100,
+            x2Mm: Math.round(colStarts[c] * 100) / 100,
+            y2Mm: Math.round(lastRowBottomY * 100) / 100,
+            strokeWidthPt: dividerBorderWidthPt,
+            color: gridColor
+          });
+        }
+
+        activeTableOnPage = null;
+      };
+
+      for (let rIdx = 0; rIdx < block.tableData.rows.length; rIdx++) {
+        const row = block.tableData.rows[rIdx];
+
+        // Wrap cell text
+        const wrappedCells: string[][] = [];
+        for (let c = 0; c < numCols; c++) {
+          const cellText = row.cells[c] || '';
+          const maxTextWidthPt = Math.max(10, colWidths[c] - (cellPaddingX * 2)) * MM_TO_PT;
+          const lines = wrapText(cellText, maxTextWidthPt, settings.fontFamily, tableFontSizePt);
+          wrappedCells.push(lines);
+        }
+        const rowLinesCount = Math.max(1, ...wrappedCells.map(w => w.length));
+
+        // Advance to next page if row exceeds remaining page lines
+        if (currentLineIndex + rowLinesCount >= linesMm.length) {
+          finishTableOnPage();
+          advanceToNextPage();
+        }
+
+        // Initialize table on this page if starting
+        if (!activeTableOnPage) {
+          // Top horizontal line is placed DIRECTLY on physical ruled line linesMm[currentLineIndex]
+          tablePageTopY = linesMm[currentLineIndex];
+
+          activeTableOnPage = {
+            id: `tbl_${block.id}_p${currentPageIndex}_${rIdx}`,
+            blockId: block.id,
+            pageIndex: currentPageIndex,
+            xMm: tableLeftX,
+            yMm: tablePageTopY,
+            widthMm: tableWidth,
+            heightMm: 0,
+            cells: [],
+            gridLines: [],
+            fontFamily: settings.fontFamily,
+            fontSizePt: tableFontSizePt
+          };
+          pageTables.push(activeTableOnPage);
+        }
+
+        // Place cell texts on the ruled lines within this row
+        for (let k = 0; k < rowLinesCount; k++) {
+          // Each subline k sits in the ruled slot ending at lineIdx
+          const lineIdx = currentLineIndex + 1 + k;
+          // Baseline sits neatly on the ruled line, with 0.75mm lift so descenders rest on the line
+          let baselineY = linesMm[lineIdx] - 0.75 + settings.baselineOffsetMm;
+          if (settings.naturalVariation) {
+            baselineY += (pseudoRandom(globalLineSeed++) - 0.5) * 0.2;
+          }
+
+          for (let c = 0; c < numCols; c++) {
+            const lineText = wrappedCells[c]?.[k];
+            if (lineText && lineText.trim().length > 0) {
+              const cellColor = row.isHeader
+                ? (settings.smartQaColors ? settings.questionColor : settings.normalColor)
+                : (settings.smartQaColors ? settings.answerColor : settings.normalColor);
+
+              activeTableOnPage.cells.push({
+                text: lineText,
+                xMm: Math.round((colStarts[c] + cellPaddingX) * 100) / 100,
+                baselineYMm: Math.round(baselineY * 100) / 100,
+                widthMm: Math.round((colWidths[c] - (cellPaddingX * 2)) * 100) / 100,
+                isHeader: row.isHeader,
+                color: cellColor
+              });
+            }
+          }
+        }
+
+        // The horizontal line under this row is placed DIRECTLY on linesMm[currentLineIndex + rowLinesCount]
+        const rowEndLineIndex = currentLineIndex + rowLinesCount;
+        const rowBottomY = linesMm[rowEndLineIndex];
+        lastRowBottomY = rowBottomY;
+
+        const isHeaderRow = !!row.isHeader;
+        const isLastRowOfTable = rIdx === block.tableData.rows.length - 1;
+        const rowLineWidthPt = isLastRowOfTable
+          ? outerBorderWidthPt
+          : isHeaderRow
+          ? headerBorderWidthPt
+          : dividerBorderWidthPt;
+
+        activeTableOnPage.gridLines.push({
+          x1Mm: tableLeftX,
+          y1Mm: Math.round(rowBottomY * 100) / 100,
+          x2Mm: tableRightX,
+          y2Mm: Math.round(rowBottomY * 100) / 100,
+          strokeWidthPt: rowLineWidthPt,
+          color: isHeaderRow && settings.smartQaColors ? settings.questionColor : gridColor
+        });
+
+        currentLineIndex += rowLinesCount;
+        totalLinesCount += rowLinesCount;
+      }
+
+      finishTableOnPage();
+
+      // Ruled line gap after table
+      currentLineIndex += 1;
+      if (currentLineIndex >= linesMm.length) {
+        advanceToNextPage();
+      }
+
+      continue; // Done with table block
+    }
+
+    // 4. Orphan prevention: if block is heading or question with <= 1 line left before page ends,
     // move to top of next page so it isn't stranded alone at the bottom
     if (
       (block.type === 'question' || block.type === 'heading') &&
@@ -278,15 +502,18 @@ export function computeLayout(
     }
   }
 
-  // Push remaining lines on the last page
-  if (pageLines.length > 0) {
+  // Push remaining lines and tables on the last page
+  if (pageLines.length > 0 || pageTables.length > 0) {
     ensurePage();
     pages[currentPageIndex].lines = [...pageLines];
+    if (pageTables.length > 0) {
+      pages[currentPageIndex].tables = [...pageTables];
+    }
   }
 
   // Ensure at least 1 page exists
   if (pages.length === 0) {
-    pages.push({ pageIndex: 0, lines: [] });
+    pages.push({ pageIndex: 0, lines: [], tables: [] });
   }
 
   return {

@@ -1,4 +1,4 @@
-﻿export type PaperSize = 'A4' | 'Letter' | 'Custom';
+export type PaperSize = 'A4' | 'Letter' | 'Custom';
 
 export interface WritingArea {
   leftMarginMm: number;
@@ -23,8 +23,20 @@ export interface TemplateConfig {
   isDefault?: boolean;
 }
 
-export type BlockType = 'question' | 'answer' | 'heading' | 'normal';
+export type BlockType = 'question' | 'answer' | 'heading' | 'normal' | 'table';
 export type TextAlignment = 'left' | 'center' | 'right';
+
+export interface TableRowData {
+  cells: string[];
+  isHeader?: boolean;
+}
+
+export interface TableData {
+  rows: TableRowData[];
+  colWidthsRatio?: number[];
+  borderWidthPt?: number;
+  borderColor?: string;
+}
 
 export interface DocumentBlock {
   id: string;
@@ -39,6 +51,7 @@ export interface DocumentBlock {
   emptyLinesBefore?: number; // Blank ruled lines before this block
   alignment?: TextAlignment; // 'left' | 'center' | 'right'
   fontSizePt?: number; // Custom font size in pt (Word-style per-line/block formatting)
+  tableData?: TableData; // Present if type === 'table'
 }
 
 export interface LayoutLine {
@@ -61,9 +74,43 @@ export interface LayoutLine {
   hasPageBreakBefore?: boolean;
 }
 
+export interface LayoutTableCell {
+  text: string;
+  xMm: number;
+  baselineYMm: number;
+  widthMm: number;
+  isHeader?: boolean;
+  color: string;
+  alignment?: TextAlignment;
+}
+
+export interface LayoutTableGridLine {
+  x1Mm: number;
+  y1Mm: number;
+  x2Mm: number;
+  y2Mm: number;
+  strokeWidthPt: number;
+  color: string;
+}
+
+export interface LayoutTable {
+  id: string;
+  blockId: string;
+  pageIndex: number;
+  xMm: number;
+  yMm: number;
+  widthMm: number;
+  heightMm: number;
+  cells: LayoutTableCell[];
+  gridLines: LayoutTableGridLine[];
+  fontFamily: string;
+  fontSizePt: number;
+}
+
 export interface LayoutPage {
   pageIndex: number;
   lines: LayoutLine[];
+  tables?: LayoutTable[];
 }
 
 export interface LayoutResult {
@@ -108,4 +155,5 @@ export interface DocxImportSummary {
   wordCount: number;
   questionsDetected: number;
   answersDetected: number;
+  tablesDetected?: number;
 }

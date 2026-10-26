@@ -1,4 +1,4 @@
-﻿@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap');
 
 /* Bundled Offline Handwriting Fonts */
 @font-face {
@@ -159,6 +159,10 @@ input, textarea, select {
 }
 
 /* Custom Scrollbar */
+.custom-scrollbar {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(51, 65, 85, 0.7) transparent;
+}
 ::-webkit-scrollbar {
   width: 6px;
   height: 6px;
@@ -184,10 +188,25 @@ input, textarea, select {
   background: var(--bg-app);
 }
 
+/* Studio Mode Viewport Lock: Prevents whole page from scrolling */
+.app-container.studio-mode,
+.app-container:has(.studio-layout) {
+  height: 100vh;
+  height: 100dvh;
+  max-height: 100vh;
+  max-height: 100dvh;
+  overflow: hidden;
+}
+
+body:has(.studio-layout) {
+  overflow: hidden;
+}
+
 .app-navbar {
   position: sticky;
   top: 0;
   z-index: 50;
+  flex-shrink: 0;
   background: rgba(15, 23, 42, 0.85);
   backdrop-filter: blur(16px);
   -webkit-backdrop-filter: blur(16px);
@@ -396,7 +415,11 @@ input, textarea, select {
 .studio-layout {
   display: flex;
   flex: 1;
-  min-height: calc(100vh - 65px);
+  height: calc(100vh - 65px);
+  height: calc(100dvh - 65px);
+  max-height: calc(100vh - 65px);
+  max-height: calc(100dvh - 65px);
+  min-height: 0;
   position: relative;
   overflow: hidden;
 }
@@ -404,18 +427,22 @@ input, textarea, select {
 /* Left Sidebar Controls */
 .studio-sidebar {
   width: 380px;
+  height: 100%;
+  max-height: 100%;
   background: var(--bg-panel);
   border-right: 1px solid var(--border-subtle);
   display: flex;
   flex-direction: column;
   flex-shrink: 0;
   z-index: 20;
+  overflow: hidden;
 }
 
 .sidebar-tabs {
   display: flex;
   border-bottom: 1px solid var(--border-subtle);
   background: rgba(11, 15, 23, 0.5);
+  flex-shrink: 0;
 }
 
 .sidebar-tab-btn {
@@ -445,7 +472,9 @@ input, textarea, select {
 
 .sidebar-content {
   flex: 1;
+  min-height: 0;
   overflow-y: auto;
+  overscroll-behavior: contain;
   padding: 1.25rem;
   display: flex;
   flex-direction: column;
@@ -455,11 +484,16 @@ input, textarea, select {
 /* Central Canvas Viewport */
 .studio-canvas-viewport {
   flex: 1;
+  height: 100%;
+  max-height: 100%;
+  min-height: 0;
+  min-width: 0;
   background-color: var(--bg-canvas);
   background-image: radial-gradient(rgba(255, 255, 255, 0.08) 1px, transparent 1px);
   background-size: 24px 24px;
   position: relative;
   overflow: auto;
+  overscroll-behavior: contain;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -1144,13 +1178,16 @@ html, body {
   /* Studio Layout: Switch between Paper View & Controls View */
   .studio-layout {
     flex-direction: column;
-    min-height: calc(100dvh - 56px);
+    height: calc(100dvh - 56px);
+    max-height: calc(100dvh - 56px);
+    min-height: 0;
     overflow: hidden;
   }
 
   /* Mobile Top Segmented Switcher */
   .mobile-view-bar {
     display: flex;
+    flex-shrink: 0;
     background: rgba(15, 23, 42, 0.95);
     backdrop-filter: blur(12px);
     -webkit-backdrop-filter: blur(12px);
@@ -1195,8 +1232,13 @@ html, body {
     display: flex !important;
     width: 100% !important;
     flex: 1;
+    height: 100% !important;
+    max-height: 100% !important;
+    min-height: 0;
     padding: 0.75rem 0.5rem 5rem 0.5rem;
     overflow-x: auto;
+    overflow-y: auto;
+    overscroll-behavior: contain;
     -webkit-overflow-scrolling: touch;
   }
 
@@ -1212,8 +1254,10 @@ html, body {
     max-width: 100% !important;
     border-right: none !important;
     flex: 1;
-    height: calc(100dvh - 105px);
-    overflow-y: auto;
+    height: 100% !important;
+    max-height: 100% !important;
+    min-height: 0;
+    overflow: hidden !important;
     -webkit-overflow-scrolling: touch;
   }
 
@@ -1224,6 +1268,7 @@ html, body {
     padding: 0.65rem 1rem;
     background: rgba(11, 15, 23, 0.85);
     border-bottom: 1px solid var(--border-subtle);
+    flex-shrink: 0;
   }
 
   /* Canvas Floating Toolbar on Mobile */

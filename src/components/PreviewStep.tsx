@@ -32,7 +32,8 @@ import {
   Bookmark,
   Sparkles,
   ArrowRight,
-  X
+  X,
+  Table as TableIcon
 } from 'lucide-react';
 
 interface Props {
@@ -100,15 +101,58 @@ export const PreviewStep: React.FC<Props> = ({
   const selectedBlockIndex = blocks.findIndex(b => b.id === selectedBlockId);
   const selectedBlock = selectedBlockIndex !== -1 ? blocks[selectedBlockIndex] : null;
 
-  // Find which page the selected block begins on
+  // Find which page the selected block begins on (checking both lines and tables)
   const selectedBlockStartPage = selectedBlockId
-    ? layout.pages.findIndex(p => p.lines.some(l => l.blockId === selectedBlockId))
+    ? layout.pages.findIndex(p => p.lines.some(l => l.blockId === selectedBlockId) || p.tables?.some(t => t.blockId === selectedBlockId))
     : -1;
 
   // Helper to update a block
   const handleUpdateBlock = (blockId: string, updates: Partial<DocumentBlock>) => {
     const updated = blocks.map(b => (b.id === blockId ? { ...b, ...updates } : b));
     onUpdateBlocks(updated);
+  };
+
+  // Helper to update a table cell
+  const handleUpdateTableCell = (blockId: string, rowIdx: number, colIdx: number, newText: string) => {
+    const block = blocks.find(b => b.id === blockId);
+    if (!block || !block.tableData) return;
+    const newRows = block.tableData.rows.map((r, rI) => {
+      if (rI !== rowIdx) return r;
+      const newCells = [...r.cells];
+      newCells[colIdx] = newText;
+      return { ...r, cells: newCells };
+    });
+    const textSummary = newRows.map(r => r.cells.join(' | ')).join('\n');
+    handleUpdateBlock(blockId, {
+      tableData: { ...block.tableData, rows: newRows },
+      text: textSummary
+    });
+  };
+
+  // Helper to add a row to a table
+  const handleAddTableRow = (blockId: string) => {
+    const block = blocks.find(b => b.id === blockId);
+    if (!block || !block.tableData) return;
+    const numCols = Math.max(1, ...block.tableData.rows.map(r => r.cells.length));
+    const newRow = { cells: Array(numCols).fill(''), isHeader: false };
+    const newRows = [...block.tableData.rows, newRow];
+    const textSummary = newRows.map(r => r.cells.join(' | ')).join('\n');
+    handleUpdateBlock(blockId, {
+      tableData: { ...block.tableData, rows: newRows },
+      text: textSummary
+    });
+  };
+
+  // Helper to delete a row from a table
+  const handleDeleteTableRow = (blockId: string, rowIdx: number) => {
+    const block = blocks.find(b => b.id === blockId);
+    if (!block || !block.tableData || block.tableData.rows.length <= 1) return;
+    const newRows = block.tableData.rows.filter((_, idx) => idx !== rowIdx);
+    const textSummary = newRows.map(r => r.cells.join(' | ')).join('\n');
+    handleUpdateBlock(blockId, {
+      tableData: { ...block.tableData, rows: newRows },
+      text: textSummary
+    });
   };
 
   // Toggle Page Break Before
@@ -303,7 +347,7 @@ export const PreviewStep: React.FC<Props> = ({
       <aside className={`studio-sidebar ${mobileView === 'controls' ? 'mobile-active' : ''}`}>
         
         {/* Mobile-only header to return to paper view */}
-        <div className="mobile-sidebar-header">
+        <div className="mobile-sidebar-header" style={{ flexShrink: 0 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.8125rem', fontWeight: 700, color: '#ffffff' }}>
             <Sliders size={15} color="var(--accent-primary)" />
             <span>Style & Text Controls</span>
@@ -319,7 +363,7 @@ export const PreviewStep: React.FC<Props> = ({
         </div>
         
         {/* Dual Tab Switcher */}
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', borderBottom: '1px solid var(--border-subtle)', background: 'var(--bg-panel-subtle)' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', borderBottom: '1px solid var(--border-subtle)', background: 'var(--bg-panel-subtle)', flexShrink: 0 }}>
           <button
             onClick={() => setActiveTab('style')}
             style={{
@@ -390,7 +434,7 @@ export const PreviewStep: React.FC<Props> = ({
                 </span>
               </div>
 
-              <div className="font-choice-grid" style={{ maxHeight: '280px', overflowY: 'auto', paddingRight: '0.25rem' }}>
+              <div className="font-choice-grid custom-scrollbar" style={{ maxHeight: '280px', overflowY: 'auto', paddingRight: '0.25rem', overscrollBehavior: 'contain' }}>
                 {[
                   { id: 'Bad Script', label: 'Bad Script', desc: 'Authentic student cursive with ink pen', badge: '⭐ Most Realistic', defaultPt: 14.0 },
                   { id: 'Mynerve', label: 'Mynerve', desc: 'Organic student notes with natural loops & wobbly pen strokes', badge: '⭐ Real Notes', defaultPt: 14.5 },
@@ -639,7 +683,394 @@ export const PreviewStep: React.FC<Props> = ({
           <div className="sidebar-content custom-scrollbar">
 
             {selectedBlock ? (
-              <>
+              selectedBlock.type === 'table' && selectedBlock.tableData ? (
+                <>
+                  {/* Table Info Header */}
+                  <div style={{ background: 'rgba(14, 165, 233, 0.12)', border: '1px solid rgba(14, 165, 233, 0.3)', borderRadius: 'var(--radius-lg)', padding: '0.75rem 0.85rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.85rem' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                      <span className="pill-badge pill-badge-blue" style={{ background: '#0284c7', display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+                        <TableIcon size={12} />
+                        Table #{selectedBlockIndex + 1}
+                      </span>
+                      {selectedBlockStartPage !== -1 && (
+                        <span style={{ fontSize: '0.6875rem', color: 'var(--text-muted)' }}>
+                          Starts on Pg {selectedBlockStartPage + 1}
+                        </span>
+                      )}
+                    </div>
+                    <button
+                      onClick={() => setSelectedBlockId(null)}
+                      className="btn btn-ghost btn-sm"
+                      style={{ padding: '0.2rem 0.4rem', color: 'var(--text-muted)' }}
+                      title="Deselect table"
+                    >
+                      <X size={14} />
+                    </button>
+                  </div>
+
+                  {/* 1. Page Break Feature for Table */}
+                  <div className="control-card" style={{ borderColor: selectedBlock.pageBreakBefore ? '#3b82f6' : 'var(--border-subtle)', background: selectedBlock.pageBreakBefore ? 'rgba(59, 130, 246, 0.12)' : 'var(--bg-card)' }}>
+                    <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '0.5rem', marginBottom: '0.5rem' }}>
+                      <div>
+                        <div style={{ fontSize: '0.8125rem', fontWeight: 700, color: '#ffffff', display: 'flex', alignItems: 'center', gap: '0.45rem' }}>
+                          <Scissors size={14} color={selectedBlock.pageBreakBefore ? '#60a5fa' : 'var(--accent-primary)'} />
+                          Move Table to Next Page
+                        </div>
+                        <p style={{ fontSize: '0.6875rem', color: 'var(--text-muted)', marginTop: '0.2rem', lineHeight: 1.35 }}>
+                          Forces this entire table to start cleanly on the top of the next ruled sheet.
+                        </p>
+                      </div>
+                    </div>
+
+                    <button
+                      onClick={() => handleTogglePageBreak(selectedBlock.id)}
+                      className={`btn ${selectedBlock.pageBreakBefore ? 'btn-primary' : 'btn-secondary'} btn-sm`}
+                      style={{ width: '100%', justifyContent: 'center', gap: '0.5rem' }}
+                    >
+                      <Scissors size={14} />
+                      {selectedBlock.pageBreakBefore ? 'Page Break Active (Starts on New Page)' : 'Move Table to Next Page'}
+                    </button>
+                  </div>
+
+                  {/* 2. Table Font Size Control */}
+                  <div className="control-card" style={{ background: selectedBlock.fontSizePt ? 'rgba(59, 130, 246, 0.08)' : 'var(--bg-card)', borderColor: selectedBlock.fontSizePt ? '#3b82f6' : 'var(--border-subtle)' }}>
+                    <div className="control-card-header">
+                      <span className="control-title">
+                        <Type size={14} color="var(--accent-primary)" />
+                        Table Cell Font Size
+                      </span>
+                      <span className="pill-badge pill-badge-blue" style={{ fontSize: '0.625rem', background: selectedBlock.fontSizePt ? '#2563eb' : 'rgba(255, 255, 255, 0.1)', color: '#ffffff' }}>
+                        {selectedBlock.fontSizePt ? `${selectedBlock.fontSizePt} pt (Custom)` : `${settings.fontSizePt > 13 ? settings.fontSizePt - 2.5 : settings.fontSizePt} pt (Auto Fit)`}
+                      </span>
+                    </div>
+
+                    <p style={{ fontSize: '0.6875rem', color: 'var(--text-muted)', marginBottom: '0.6rem', lineHeight: 1.35 }}>
+                      Scale handwriting font size inside table cells to fit compact rows.
+                    </p>
+
+                    <div className="slider-group">
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', marginBottom: '0.5rem' }}>
+                        <button
+                          onClick={() => handleAdjustBlockFontSize(selectedBlock.id, -1)}
+                          className="btn btn-secondary btn-sm"
+                          style={{ padding: '0.3rem 0.5rem', fontWeight: 800 }}
+                          title="Decrease -1pt"
+                        >
+                          - 1 pt
+                        </button>
+                        <input
+                          type="range"
+                          min="8"
+                          max="18"
+                          step="0.5"
+                          value={selectedBlock.fontSizePt || (settings.fontSizePt > 13 ? settings.fontSizePt - 2.5 : settings.fontSizePt)}
+                          onChange={e => handleSetBlockFontSize(selectedBlock.id, parseFloat(e.target.value))}
+                          className="slider-input"
+                          style={{ flex: 1 }}
+                        />
+                        <button
+                          onClick={() => handleAdjustBlockFontSize(selectedBlock.id, 1)}
+                          className="btn btn-secondary btn-sm"
+                          style={{ padding: '0.3rem 0.5rem', fontWeight: 800 }}
+                          title="Increase +1pt"
+                        >
+                          + 1 pt
+                        </button>
+                      </div>
+
+                      {/* Presets */}
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.3rem', flexWrap: 'wrap' }}>
+                        <span style={{ fontSize: '0.625rem', color: 'var(--text-muted)' }}>Presets:</span>
+                        {[9, 10.5, 12, 13.5, 15].map(pt => (
+                          <button
+                            key={pt}
+                            onClick={() => handleSetBlockFontSize(selectedBlock.id, pt)}
+                            className={`btn ${(selectedBlock.fontSizePt || 12) === pt ? 'btn-primary' : 'btn-secondary'} btn-sm`}
+                            style={{ padding: '0.15rem 0.4rem', fontSize: '0.6875rem' }}
+                          >
+                            {pt}pt
+                          </button>
+                        ))}
+                        {selectedBlock.fontSizePt && (
+                          <button
+                            onClick={() => handleSetBlockFontSize(selectedBlock.id, undefined)}
+                            className="btn btn-ghost btn-sm"
+                            style={{ padding: '0.15rem 0.35rem', fontSize: '0.6875rem', color: '#60a5fa' }}
+                            title="Reset to default"
+                          >
+                            Reset
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* 3. Table Grid Line Thickness & Ink Color */}
+                  <div className="control-card">
+                    <div className="control-card-header">
+                      <span className="control-title">
+                        <Sliders size={14} color="var(--accent-primary)" />
+                        Table Line Thickness &amp; Ink
+                      </span>
+                      <span className="pill-badge pill-badge-blue" style={{ fontSize: '0.625rem' }}>
+                        {selectedBlock.tableData.borderWidthPt || 1.8} pt
+                      </span>
+                    </div>
+
+                    <p style={{ fontSize: '0.6875rem', color: 'var(--text-muted)', marginBottom: '0.6rem', lineHeight: 1.35 }}>
+                      Horizontal lines snap directly onto ruled lines. Select thickness so lines stand out prominently:
+                    </p>
+
+                    {/* Thickness Presets */}
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '0.35rem', marginBottom: '0.65rem' }}>
+                      {[
+                        { label: 'Medium', pt: 1.4, desc: '1.4 pt' },
+                        { label: 'Thick (Bold)', pt: 1.8, desc: '1.8 pt (Default)' },
+                        { label: 'Extra Thick', pt: 2.4, desc: '2.4 pt' }
+                      ].map(preset => {
+                        const currentPt = selectedBlock.tableData?.borderWidthPt || 1.8;
+                        const isCurrent = Math.abs(currentPt - preset.pt) < 0.1;
+                        return (
+                          <button
+                            key={preset.pt}
+                            onClick={() => {
+                              handleUpdateBlock(selectedBlock.id, {
+                                tableData: {
+                                  ...selectedBlock.tableData!,
+                                  borderWidthPt: preset.pt
+                                }
+                              });
+                            }}
+                            className={`btn ${isCurrent ? 'btn-primary' : 'btn-secondary'} btn-sm`}
+                            style={{ flexDirection: 'column', padding: '0.4rem 0.25rem', gap: '0.1rem', fontSize: '0.6875rem' }}
+                          >
+                            <span style={{ fontWeight: 700 }}>{preset.label}</span>
+                            <span style={{ fontSize: '0.6rem', opacity: 0.8 }}>{preset.desc}</span>
+                          </button>
+                        );
+                      })}
+                    </div>
+
+                    {/* Grid Color Options */}
+                    <div style={{ paddingTop: '0.5rem', borderTop: '1px solid var(--border-subtle)' }}>
+                      <div style={{ fontSize: '0.6875rem', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '0.35rem' }}>
+                        Grid Line Ink:
+                      </div>
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '0.35rem' }}>
+                        {[
+                          { label: 'Royal Blue', color: '#1e3a8a', icon: '🔵' },
+                          { label: 'Deep Black', color: '#111827', icon: '⚫' },
+                          { label: 'Document Ink', color: undefined, icon: '🖊️' }
+                        ].map(c => {
+                          const isCurrent = selectedBlock.tableData?.borderColor === c.color;
+                          return (
+                            <button
+                              key={c.label}
+                              onClick={() => {
+                                handleUpdateBlock(selectedBlock.id, {
+                                  tableData: {
+                                    ...selectedBlock.tableData!,
+                                    borderColor: c.color
+                                  }
+                                });
+                              }}
+                              className={`btn ${isCurrent ? 'btn-primary' : 'btn-secondary'} btn-sm`}
+                              style={{ fontSize: '0.6875rem', justifyContent: 'center', gap: '0.25rem', padding: '0.35rem 0.25rem' }}
+                            >
+                              <span>{c.icon}</span>
+                              <span>{c.label}</span>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* 4. Margin Indentation & Ruled Line Spacing */}
+                  <div className="control-card">
+                    <div className="control-card-header">
+                      <span className="control-title">
+                        <Sliders size={14} color="var(--accent-primary)" />
+                        Table Indent &amp; Line Spacing
+                      </span>
+                    </div>
+
+                    <div style={{ marginBottom: '0.85rem' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.35rem' }}>
+                        <span style={{ fontSize: '0.6875rem', fontWeight: 600, color: 'var(--text-secondary)' }}>
+                          Left Margin Indentation:
+                        </span>
+                        <span className="slider-val-badge">
+                          +{selectedBlock.indentMm || 0} mm
+                        </span>
+                      </div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                        <button
+                          onClick={() => handleAdjustIndent(selectedBlock.id, -5)}
+                          disabled={(selectedBlock.indentMm || 0) <= 0}
+                          className="btn btn-secondary btn-sm"
+                          style={{ flex: 1, justifyContent: 'center' }}
+                        >
+                          - 5 mm
+                        </button>
+                        <button
+                          onClick={() => handleUpdateBlock(selectedBlock.id, { indentMm: 0 })}
+                          className="btn btn-secondary btn-sm"
+                          style={{ padding: '0.35rem 0.5rem' }}
+                          title="Reset to 0mm"
+                        >
+                          0mm
+                        </button>
+                        <button
+                          onClick={() => handleAdjustIndent(selectedBlock.id, 5)}
+                          disabled={(selectedBlock.indentMm || 0) >= 60}
+                          className="btn btn-secondary btn-sm"
+                          style={{ flex: 1, justifyContent: 'center' }}
+                        >
+                          + 5 mm
+                        </button>
+                      </div>
+                    </div>
+
+                    <div style={{ paddingTop: '0.6rem', borderTop: '1px solid var(--border-subtle)' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.35rem' }}>
+                        <span style={{ fontSize: '0.6875rem', fontWeight: 600, color: 'var(--text-secondary)' }}>
+                          Ruled Line Spacing Before:
+                        </span>
+                        <span className="slider-val-badge">
+                          {selectedBlock.emptyLinesBefore !== undefined ? selectedBlock.emptyLinesBefore : 1} line(s)
+                        </span>
+                      </div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                        <button
+                          onClick={() => handleAdjustGap(selectedBlock.id, -1)}
+                          className="btn btn-secondary btn-sm"
+                          style={{ flex: 1, justifyContent: 'center' }}
+                        >
+                          - 1 Line
+                        </button>
+                        <button
+                          onClick={() => handleAdjustGap(selectedBlock.id, 1)}
+                          className="btn btn-secondary btn-sm"
+                          style={{ flex: 1, justifyContent: 'center' }}
+                        >
+                          + 1 Line
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* 4. Live Table Cells Editor */}
+                  <div className="control-card">
+                    <div className="control-card-header">
+                      <span className="control-title">
+                        <TableIcon size={14} color="var(--accent-primary)" />
+                        Table Cell Contents
+                      </span>
+                      <span style={{ fontSize: '0.6875rem', color: 'var(--text-muted)' }}>
+                        {selectedBlock.tableData.rows.length} rows &times; {selectedBlock.tableData.rows[0]?.cells.length || 0} cols
+                      </span>
+                    </div>
+
+                    <div style={{ overflowX: 'auto', border: '1px solid var(--border-medium)', borderRadius: 'var(--radius-md)', background: 'var(--bg-input)', marginBottom: '0.5rem' }}>
+                      <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.75rem' }}>
+                        <tbody>
+                          {selectedBlock.tableData.rows.map((row, rIdx) => (
+                            <tr key={rIdx} style={{ background: row.isHeader ? 'rgba(59, 130, 246, 0.15)' : undefined, borderBottom: '1px solid var(--border-subtle)' }}>
+                              {row.cells.map((cell, cIdx) => (
+                                <td key={cIdx} style={{ padding: '0.3rem', borderRight: '1px solid var(--border-subtle)' }}>
+                                  <input
+                                    type="text"
+                                    value={cell}
+                                    onChange={e => handleUpdateTableCell(selectedBlock.id, rIdx, cIdx, e.target.value)}
+                                    placeholder={row.isHeader ? `Header ${cIdx + 1}` : '...'}
+                                    style={{
+                                      width: '100%',
+                                      background: 'transparent',
+                                      border: 'none',
+                                      outline: 'none',
+                                      color: '#ffffff',
+                                      fontWeight: row.isHeader ? 700 : 400,
+                                      fontSize: '0.75rem',
+                                      padding: '0.2rem'
+                                    }}
+                                  />
+                                </td>
+                              ))}
+                              <td style={{ width: '28px', textAlign: 'center', padding: '0.2rem' }}>
+                                {selectedBlock.tableData!.rows.length > 1 && (
+                                  <button
+                                    type="button"
+                                    onClick={() => handleDeleteTableRow(selectedBlock.id, rIdx)}
+                                    className="btn btn-ghost btn-sm"
+                                    style={{ padding: '0.15rem', color: '#f87171' }}
+                                    title="Delete row"
+                                  >
+                                    <Trash2 size={12} />
+                                  </button>
+                                )}
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+
+                    <div style={{ display: 'flex', gap: '0.5rem' }}>
+                      <button
+                        type="button"
+                        onClick={() => handleAddTableRow(selectedBlock.id)}
+                        className="btn btn-secondary btn-sm"
+                        style={{ fontSize: '0.6875rem' }}
+                      >
+                        <Plus size={12} />
+                        Add Row
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* 5. Block Management */}
+                  <div className="control-card">
+                    <div className="control-card-header">
+                      <span className="control-title">
+                        <Sparkles size={14} color="var(--accent-primary)" />
+                        Table Actions
+                      </span>
+                    </div>
+
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.4rem', marginBottom: '0.4rem' }}>
+                      <button
+                        onClick={() => handleMoveBlock(selectedBlock.id, 'up')}
+                        disabled={selectedBlockIndex === 0}
+                        className="btn btn-secondary btn-sm"
+                        style={{ justifyContent: 'center', gap: '0.35rem' }}
+                      >
+                        <ArrowUp size={13} />
+                        Move Up
+                      </button>
+                      <button
+                        onClick={() => handleMoveBlock(selectedBlock.id, 'down')}
+                        disabled={selectedBlockIndex === blocks.length - 1}
+                        className="btn btn-secondary btn-sm"
+                        style={{ justifyContent: 'center', gap: '0.35rem' }}
+                      >
+                        <ArrowDown size={13} />
+                        Move Down
+                      </button>
+                    </div>
+
+                    <button
+                      onClick={() => handleDeleteBlock(selectedBlock.id)}
+                      className="btn btn-ghost btn-sm"
+                      style={{ width: '100%', justifyContent: 'center', color: '#ef4444', border: '1px solid rgba(239, 68, 68, 0.25)', marginTop: '0.25rem' }}
+                    >
+                      <Trash2 size={13} />
+                      Delete this Table
+                    </button>
+                  </div>
+                </>
+              ) : (
+                <>
                 {/* Selected Block Info Header */}
                 <div style={{ background: 'rgba(59, 130, 246, 0.1)', border: '1px solid rgba(59, 130, 246, 0.25)', borderRadius: 'var(--radius-lg)', padding: '0.75rem 0.85rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.85rem' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
@@ -1085,7 +1516,8 @@ export const PreviewStep: React.FC<Props> = ({
                   </button>
                 </div>
               </>
-            ) : (
+            )
+          ) : (
               /* No Block Selected State: Guide & Topic Outline */
               <div>
                 <div style={{ background: 'rgba(59, 130, 246, 0.08)', border: '1px dashed var(--accent-primary)', borderRadius: 'var(--radius-lg)', padding: '1rem', textAlign: 'center', marginBottom: '1.25rem' }}>
@@ -1120,10 +1552,11 @@ export const PreviewStep: React.FC<Props> = ({
                 </span>
               </div>
 
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem', maxHeight: '280px', overflowY: 'auto' }} className="custom-scrollbar">
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem', maxHeight: '280px', overflowY: 'auto', overscrollBehavior: 'contain' }} className="custom-scrollbar">
                 {blocks.map((b, idx) => {
                   const isSelected = b.id === selectedBlockId;
-                  const blockPage = layout.pages.findIndex(p => p.lines.some(l => l.blockId === b.id));
+                  const isTable = b.type === 'table';
+                  const blockPage = layout.pages.findIndex(p => p.lines.some(l => l.blockId === b.id) || p.tables?.some(t => t.blockId === b.id));
 
                   return (
                     <div
@@ -1143,7 +1576,8 @@ export const PreviewStep: React.FC<Props> = ({
                     >
                       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.35rem', marginBottom: '0.2rem' }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
-                          <span style={{ fontSize: '0.625rem', fontWeight: 800, color: b.type === 'question' ? '#ffffff' : b.type === 'heading' ? '#c084fc' : '#60a5fa' }}>
+                          <span style={{ fontSize: '0.625rem', fontWeight: 800, color: b.type === 'question' ? '#ffffff' : b.type === 'heading' ? '#c084fc' : isTable ? '#38bdf8' : '#60a5fa', display: 'flex', alignItems: 'center', gap: '0.2rem' }}>
+                            {isTable && <TableIcon size={11} />}
                             #{idx + 1} {b.type.toUpperCase()}
                           </span>
                           {b.marginPrefix && (
@@ -1169,7 +1603,9 @@ export const PreviewStep: React.FC<Props> = ({
                         )}
                       </div>
                       <div style={{ fontSize: '0.6875rem', color: isSelected ? '#ffffff' : 'var(--text-secondary)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                        {b.text}
+                        {isTable && b.tableData
+                          ? `Table (${b.tableData.rows.length} rows × ${b.tableData.rows[0]?.cells.length || 0} cols): ${b.tableData.rows.map(r => r.cells.join(' | ')).join(' ; ')}`
+                          : b.text}
                       </div>
                     </div>
                   );
@@ -1446,6 +1882,94 @@ export const PreviewStep: React.FC<Props> = ({
                   </g>
                 );
               })}
+
+              {/* Layer 3b: Table Grid Lines and Cells */}
+              {pageData.tables?.map((table) => {
+                const isSelected = selectedBlockId === table.blockId;
+                const fontSizeMm = table.fontSizePt * (25.4 / 72);
+
+                return (
+                  <g key={table.id} className="paper-svg-table">
+                    {/* Visual selection highlight background */}
+                    {isSelected && (
+                      <rect
+                        x={table.xMm - 1}
+                        y={table.yMm - 1}
+                        width={table.widthMm + 2}
+                        height={table.heightMm + 2}
+                        rx="1"
+                        fill="rgba(59, 130, 246, 0.12)"
+                        stroke="#3b82f6"
+                        strokeWidth="0.4"
+                        strokeDasharray="1.5 1"
+                        style={{ pointerEvents: 'none' }}
+                      />
+                    )}
+
+                    {/* Transparent Clickable Table Region */}
+                    <rect
+                      x={table.xMm}
+                      y={table.yMm}
+                      width={table.widthMm}
+                      height={table.heightMm}
+                      fill="transparent"
+                      onClick={() => {
+                        setSelectedBlockId(isSelected ? null : table.blockId);
+                        setActiveTab('content');
+                      }}
+                      style={{ cursor: 'pointer' }}
+                    >
+                      <title>Click to select &amp; edit table</title>
+                    </rect>
+
+                    {/* Table Grid Lines */}
+                    {table.gridLines.map((gl, glIdx) => (
+                      <line
+                        key={`gl_${table.id}_${glIdx}`}
+                        x1={gl.x1Mm}
+                        y1={gl.y1Mm}
+                        x2={gl.x2Mm}
+                        y2={gl.y2Mm}
+                        stroke={gl.color}
+                        strokeWidth={gl.strokeWidthPt * (25.4 / 72)}
+                        strokeLinecap="round"
+                        onClick={() => {
+                          setSelectedBlockId(isSelected ? null : table.blockId);
+                          setActiveTab('content');
+                        }}
+                        style={{ cursor: 'pointer' }}
+                      />
+                    ))}
+
+                    {/* Table Cell Handwritten Text */}
+                    {table.cells.map((cell, cIdx) => {
+                      if (!cell.text || !cell.text.trim()) return null;
+                      return (
+                        <text
+                          key={`cell_${table.id}_${cIdx}`}
+                          x={cell.xMm}
+                          y={cell.baselineYMm}
+                          fontSize={fontSizeMm}
+                          fontFamily={`"${table.fontFamily}", cursive, sans-serif`}
+                          fontWeight={cell.isHeader ? 600 : 400}
+                          fill={cell.color}
+                          dominantBaseline="alphabetic"
+                          textAnchor={cell.alignment === 'center' ? 'middle' : cell.alignment === 'right' ? 'end' : 'start'}
+                          onClick={() => {
+                            setSelectedBlockId(isSelected ? null : table.blockId);
+                            setActiveTab('content');
+                          }}
+                          className={`paper-svg-line ${isSelected ? 'selected' : ''}`}
+                          style={{ cursor: 'pointer', userSelect: 'none' }}
+                        >
+                          <title>{`Table Cell: ${cell.text}`}</title>
+                          {cell.text}
+                        </text>
+                      );
+                    })}
+                  </g>
+                );
+              })}
             </svg>
 
             {/* Layer 4: Page Break Badges */}
@@ -1475,6 +1999,36 @@ export const PreviewStep: React.FC<Props> = ({
                 PAGE BREAK
               </div>
             ))}
+            {pageData.tables?.map(tbl => {
+              const blk = blocks.find(b => b.id === tbl.blockId);
+              if (!blk?.pageBreakBefore) return null;
+              return (
+                <div
+                  key={`pb_tbl_${tbl.id}`}
+                  style={{
+                    position: 'absolute',
+                    left: toXPercent(template.writingArea.leftMarginMm),
+                    top: `calc(${toYPercent(tbl.yMm)} - 22px)`,
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '0.35rem',
+                    padding: '2px 7px',
+                    background: 'rgba(59, 130, 246, 0.95)',
+                    color: '#ffffff',
+                    borderRadius: '3px',
+                    fontSize: '9px',
+                    fontWeight: 700,
+                    letterSpacing: '0.04em',
+                    zIndex: 25,
+                    boxShadow: '0 2px 4px rgba(0,0,0,0.3)',
+                    pointerEvents: 'none'
+                  }}
+                >
+                  <Scissors size={9} />
+                  PAGE BREAK
+                </div>
+              );
+            })}
 
           </div>
         </div>
@@ -1482,9 +2036,9 @@ export const PreviewStep: React.FC<Props> = ({
         {/* Floating Quick Action Popover when a block is selected */}
         {selectedBlock && (
           <div className="studio-floating-popover">
-            <span style={{ fontSize: '0.75rem', color: '#ffffff', fontWeight: 600 }}>
+            <span style={{ fontSize: '0.75rem', color: '#ffffff', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
               {selectedBlock.marginPrefix ? `[${selectedBlock.marginPrefix}] ` : ''}
-              {selectedBlock.type === 'question' ? '❓ Question' : selectedBlock.type === 'heading' ? '🏷️ Topic' : '📝 Answer'}:
+              {selectedBlock.type === 'question' ? '❓ Question' : selectedBlock.type === 'heading' ? '🏷️ Topic' : selectedBlock.type === 'table' ? '📊 Table' : '📝 Answer'}:
             </span>
 
             {/* Line Font Size Controls */}

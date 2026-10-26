@@ -46,3 +46,4 @@ Thumbs.db
 *.pdf
 scratch/
 __pycache__/
+*_backup.*

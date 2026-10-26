@@ -232,6 +232,56 @@ export async function generateHandwritingPdf(
         }
       }
     }
+
+    // Render tables on this page
+    if (layoutPage.tables && layoutPage.tables.length > 0) {
+      for (const tbl of layoutPage.tables) {
+        // 1. Draw table grid lines (outer border, horizontal row dividers, and vertical column dividers)
+        for (const gl of tbl.gridLines) {
+          const x1Pt = gl.x1Mm * MM_TO_PT;
+          const y1Pt = (template.pageHeightMm - gl.y1Mm) * MM_TO_PT;
+          const x2Pt = gl.x2Mm * MM_TO_PT;
+          const y2Pt = (template.pageHeightMm - gl.y2Mm) * MM_TO_PT;
+          const lineColor = parseHexColor(gl.color);
+
+          page.drawLine({
+            start: { x: x1Pt, y: y1Pt },
+            end: { x: x2Pt, y: y2Pt },
+            thickness: gl.strokeWidthPt,
+            color: lineColor
+          });
+        }
+
+        // 2. Draw table cell handwritten text
+        for (const cell of tbl.cells) {
+          if (!cell.text || cell.text.trim().length === 0) continue;
+          const cellPdfX = cell.xMm * MM_TO_PT;
+          const cellPdfY = (template.pageHeightMm - cell.baselineYMm) * MM_TO_PT;
+          const cellColor = parseHexColor(cell.color);
+
+          try {
+            page.drawText(cell.text, {
+              x: cellPdfX,
+              y: cellPdfY,
+              size: tbl.fontSizePt,
+              font: embeddedFont,
+              color: cellColor,
+              lineHeight: tbl.fontSizePt
+            });
+          } catch {
+            const sanitized = cell.text.replace(/[^\x00-\x7F]/g, '?');
+            page.drawText(sanitized, {
+              x: cellPdfX,
+              y: cellPdfY,
+              size: tbl.fontSizePt,
+              font: embeddedFont,
+              color: cellColor,
+              lineHeight: tbl.fontSizePt
+            });
+          }
+        }
+      }
+    }
   }
 
   return await pdfDoc.save();

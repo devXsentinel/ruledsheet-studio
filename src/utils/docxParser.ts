@@ -1,14 +1,85 @@
 import mammoth from 'mammoth';
-import { DocumentBlock, DocxImportSummary, BlockType } from '../types';
+import { DocumentBlock, DocxImportSummary, BlockType, TableData, TableRowData } from '../types';
 
 export interface ParseDocxResult {
   blocks: DocumentBlock[];
   summary: DocxImportSummary;
 }
 
+export interface RawBlockItem {
+  text: string;
+  tag: string;
+  isList: boolean;
+  tableData?: TableData;
+}
+
+/**
+ * Extracts structured rows and cells from an HTML table element.
+ */
+export function extractTableDataFromElement(tableElem: Element): TableData | null {
+  const rows: TableRowData[] = [];
+  const trElements = tableElem.querySelectorAll('tr');
+  if (trElements.length === 0) return null;
+
+  trElements.forEach((tr, rowIdx) => {
+    const cellElements = tr.querySelectorAll('th, td');
+    const cells: string[] = [];
+    let isHeader = false;
+
+    cellElements.forEach(cell => {
+      if (cell.tagName.toLowerCase() === 'th') isHeader = true;
+      // Clean and normalize cell text
+      const text = cell.textContent?.trim().replace(/\s+/g, ' ') || '';
+      cells.push(text);
+    });
+
+    if (rowIdx === 0 && (isHeader || tr.parentElement?.tagName.toLowerCase() === 'thead')) {
+      isHeader = true;
+    }
+
+    if (cells.length > 0 && cells.some(c => c.length > 0)) {
+      rows.push({ cells, isHeader });
+    }
+  });
+
+  if (rows.length === 0) return null;
+
+  // Default first row as header if multiple rows exist and none was explicitly marked
+  if (rows.length > 1 && !rows.some(r => r.isHeader)) {
+    rows[0].isHeader = true;
+  }
+
+  return { rows };
+}
+
+/**
+ * Parses markdown pipe tables into structured TableData.
+ */
+export function parseMarkdownTable(lines: string[]): TableData | null {
+  const rows: TableRowData[] = [];
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i].trim();
+    if (!line.includes('|')) continue;
+    // Skip divider rows like |---|---|
+    if (/^\|?(\s*:?-+:?\s*\|?)+$/.test(line)) {
+      if (rows.length > 0) {
+        rows[rows.length - 1].isHeader = true;
+      }
+      continue;
+    }
+    const rawCells = line.replace(/^\|/, '').replace(/\|$/, '').split('|');
+    const cells = rawCells.map(c => c.trim());
+    if (cells.length > 0 && cells.some(c => c.length > 0)) {
+      rows.push({ cells, isHeader: rows.length === 0 });
+    }
+  }
+  if (rows.length === 0) return null;
+  return { rows };
+}
+
 /**
  * Parses a .docx File object in the browser using mammoth,
- * extracting structured paragraphs and applying intelligent Q&A classification.
+ * extracting structured paragraphs, lists, and tables with intelligent Q&A classification.
  */
 export async function parseDocxFile(file: File): Promise<ParseDocxResult> {
   if (!file.name.toLowerCase().endsWith('.docx')) {
@@ -18,7 +89,7 @@ export async function parseDocxFile(file: File): Promise<ParseDocxResult> {
   const arrayBuffer = await file.arrayBuffer();
 
   try {
-    // Extract HTML to preserve headings, lists, and paragraphs
+    // Extract HTML to preserve headings, lists, tables, and paragraphs
     const result = await mammoth.convertToHtml({ arrayBuffer });
     const html = result.value;
 
@@ -31,12 +102,50 @@ export async function parseDocxFile(file: File): Promise<ParseDocxResult> {
     const doc = parser.parseFromString(html, 'text/html');
     const nodes = doc.body.children;
 
-    const rawBlocks: { text: string; tag: string; isList: boolean }[] = [];
+    const rawBlocks: RawBlockItem[] = [];
 
     for (let i = 0; i < nodes.length; i++) {
       const node = nodes[i];
       const tag = node.tagName.toLowerCase();
 
+      // 1. Direct Table Element
+      if (tag === 'table') {
+        const tableData = extractTableDataFromElement(node);
+        if (tableData) {
+          const textSummary = tableData.rows.map(r => r.cells.join(' | ')).join('\n');
+          rawBlocks.push({
+            text: textSummary,
+            tag: 'table',
+            isList: false,
+            tableData
+          });
+          continue;
+        }
+      }
+
+      // 2. Nested Table Element (e.g. wrapper div)
+      const nestedTable = node.querySelector('table');
+      if (nestedTable && tag !== 'p') {
+        const clone = node.cloneNode(true) as Element;
+        clone.querySelectorAll('table').forEach(t => t.remove());
+        const preText = clone.textContent?.trim();
+        if (preText) {
+          rawBlocks.push({ text: preText, tag: 'p', isList: false });
+        }
+        const tableData = extractTableDataFromElement(nestedTable);
+        if (tableData) {
+          const textSummary = tableData.rows.map(r => r.cells.join(' | ')).join('\n');
+          rawBlocks.push({
+            text: textSummary,
+            tag: 'table',
+            isList: false,
+            tableData
+          });
+          continue;
+        }
+      }
+
+      // 3. Lists
       if (tag === 'ul' || tag === 'ol') {
         const listItems = node.querySelectorAll('li');
         listItems.forEach((li, idx) => {
@@ -47,6 +156,7 @@ export async function parseDocxFile(file: File): Promise<ParseDocxResult> {
           }
         });
       } else {
+        // 4. Regular Paragraphs
         const txt = node.textContent?.trim() || '';
         if (txt) {
           rawBlocks.push({ text: txt, tag, isList: false });
@@ -68,6 +178,7 @@ export async function parseDocxFile(file: File): Promise<ParseDocxResult> {
     const wordCount = blocks.reduce((acc, b) => acc + b.text.split(/\s+/).filter(Boolean).length, 0);
     const questionsDetected = blocks.filter(b => b.type === 'question' || b.type === 'heading').length;
     const answersDetected = blocks.filter(b => b.type === 'answer').length;
+    const tablesDetected = blocks.filter(b => b.type === 'table').length;
 
     const summary: DocxImportSummary = {
       fileName: file.name,
@@ -75,7 +186,8 @@ export async function parseDocxFile(file: File): Promise<ParseDocxResult> {
       paragraphCount: blocks.length,
       wordCount,
       questionsDetected,
-      answersDetected
+      answersDetected,
+      tablesDetected
     };
 
     return { blocks, summary };
@@ -127,21 +239,32 @@ export function extractMarginPrefix(rawText: string): PrefixExtraction {
 }
 
 /**
- * Classifies raw paragraph blocks into Question, Answer, Heading, or Normal,
+ * Classifies raw paragraph blocks into Question, Answer, Heading, Normal, or Table,
  * automatically separating margin tags (Q.1, Ans.) from body text.
  */
-export function classifyBlocks(
-  items: { text: string; tag: string; isList: boolean }[]
-): DocumentBlock[] {
+export function classifyBlocks(items: RawBlockItem[]): DocumentBlock[] {
   const blocks: DocumentBlock[] = [];
   let inQuestionContext = false;
 
   for (let i = 0; i < items.length; i++) {
-    const { text, tag, isList } = items[i];
+    const { text, tag, isList, tableData } = items[i];
     const id = `block_${i}_${Date.now()}`;
     const cleanText = text.trim();
 
-    // Check if heading
+    // 1. Table Block
+    if (tag === 'table' && tableData) {
+      blocks.push({
+        id,
+        type: 'table',
+        text: cleanText,
+        indentMm: 0,
+        sourceParagraphIndex: i,
+        tableData
+      });
+      continue;
+    }
+
+    // 2. Heading
     if (tag.startsWith('h') && tag.length === 2) {
       blocks.push({
         id,
@@ -196,23 +319,70 @@ export function classifyBlocks(
 }
 
 /**
- * Parses plain text pasted or edited by the user into structured blocks.
+ * Parses plain text pasted or edited by the user into structured blocks,
+ * with automatic detection of markdown pipe tables (| col 1 | col 2 |).
  */
 export function parsePlainText(raw: string): DocumentBlock[] {
-  const paragraphs = raw.split(/\r?\n\s*\r?\n|\r?\n/).map(p => p.trim()).filter(Boolean);
-  const items = paragraphs.map(p => ({
-    text: p,
-    tag: p.startsWith('#') ? 'h2' : 'p',
-    isList: /^[•\-\*]|\d+\.\s/.test(p)
-  }));
+  const lines = raw.split(/\r?\n/);
+  const items: RawBlockItem[] = [];
+  let tableLinesBuffer: string[] = [];
+
+  const flushTableBuffer = () => {
+    if (tableLinesBuffer.length > 0) {
+      const tableData = parseMarkdownTable(tableLinesBuffer);
+      if (tableData) {
+        items.push({
+          text: tableLinesBuffer.join('\n'),
+          tag: 'table',
+          isList: false,
+          tableData
+        });
+      } else {
+        tableLinesBuffer.forEach(l => {
+          if (l.trim()) {
+            items.push({ text: l.trim(), tag: 'p', isList: false });
+          }
+        });
+      }
+      tableLinesBuffer = [];
+    }
+  };
+
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i].trim();
+
+    if (line.startsWith('|') && line.endsWith('|')) {
+      tableLinesBuffer.push(line);
+      continue;
+    } else {
+      flushTableBuffer();
+    }
+
+    if (!line) continue;
+
+    items.push({
+      text: line,
+      tag: line.startsWith('#') ? 'h2' : 'p',
+      isList: /^[•\-\*]|\d+\.\s/.test(line)
+    });
+  }
+
+  flushTableBuffer();
+
   return classifyBlocks(items);
 }
 
 /**
- * Built-in realistic sample assignment text for instant testing
+ * Built-in realistic sample assignment text with questions, answers, and a comparison table for instant testing
  */
 export const SAMPLE_ASSIGNMENT_TEXT = `Q.1 Explain the difference between Microprocessor and Microcontroller with suitable examples.
 Ans. A Microprocessor contains only the central processing unit (CPU) on a single integrated chip, requiring external memory (RAM, ROM) and I/O ports to function as a complete system (e.g., Intel Core i7, 8085). In contrast, a Microcontroller integrates a CPU, memory, timers, and I/O peripherals onto a single chip, making it ideal for dedicated embedded control systems (e.g., Arduino ATmega328, 8051).
+
+| Feature | Microprocessor | Microcontroller |
+| Architecture | Only CPU integrated on chip | CPU, RAM, ROM, Timers on chip |
+| Memory | Requires external RAM & ROM | Has built-in RAM & ROM |
+| Typical Cost | Higher overall system cost | Lower cost, compact design |
+| Applications | Laptops, Desktop Computers | Arduino, Washing Machines, Car ECUs |
 
 Q.2 What are the primary functions of an Operating System? Discuss process scheduling.
 Ans. An Operating System acts as an intermediary between computer hardware and the user. Its main functions include processor management, memory allocation, device driver management, file system organization, and system security.

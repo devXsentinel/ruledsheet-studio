@@ -90,7 +90,7 @@ export const App: React.FC = () => {
   };
 
   return (
-    <div className="app-container">
+    <div className={`app-container ${currentStep === 'preview' ? 'studio-mode' : ''}`}>
 
       {/* Top Application Header */}
       <header className="app-navbar">
