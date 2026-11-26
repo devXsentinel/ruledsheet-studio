@@ -1780,13 +1780,24 @@ export const PreviewStep: React.FC<Props> = ({
         </div>
 
         {/* The Paper Sheet Container */}
-        <div className="paper-container">
+        <div
+          className="paper-container"
+          style={{
+            height: `${Math.round(680 * aspectRatio * zoom) + 40}px`
+          }}
+        >
           <div
             className={`paper-sheet ${previewMode === 'print' ? 'print-mode' : ''}`}
             style={{
               width: '680px',
+              minWidth: '680px',
+              maxWidth: '680px',
               height: `${Math.round(680 * aspectRatio)}px`,
-              transform: `scale(${zoom})`
+              minHeight: `${Math.round(680 * aspectRatio)}px`,
+              maxHeight: `${Math.round(680 * aspectRatio)}px`,
+              flexShrink: 0,
+              transform: `scale(${zoom})`,
+              transformOrigin: 'top center'
             }}
           >
             {/* Layer 1: Background Template Sheet (if Sheet Preview mode) */}
@@ -1800,7 +1811,11 @@ export const PreviewStep: React.FC<Props> = ({
 
             {/* Layer 2: Visual Alignment Rules (when toggled) */}
             {showGuides && (
-              <svg className="paper-svg-guides">
+              <svg
+                className="paper-svg-guides"
+                viewBox={`0 0 ${template.pageWidthMm} ${template.pageHeightMm}`}
+                preserveAspectRatio="none"
+              >
                 {/* Margin label position guide (near index line) */}
                 <line
                   x1={toXPercent(settings.marginPrefixXMm || template.writingArea.marginLabelXMm || 19.5)}
@@ -1860,6 +1875,7 @@ export const PreviewStep: React.FC<Props> = ({
             <svg
               className="paper-text-layer"
               viewBox={`0 0 ${template.pageWidthMm} ${template.pageHeightMm}`}
+              preserveAspectRatio="none"
               style={{
                 position: 'absolute',
                 inset: 0,

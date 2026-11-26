@@ -602,6 +602,9 @@ body:has(.studio-layout) {
   transform-origin: top center;
   transition: transform 0.12s ease-out;
   overflow: hidden;
+  flex-shrink: 0 !important;
+  min-width: 680px !important;
+  max-width: 680px !important;
 }
 
 .paper-sheet.print-mode {
@@ -1453,6 +1456,8 @@ html, body {
 
   .studio-layout.mobile-view-paper .studio-canvas-viewport {
     display: flex !important;
+    flex-direction: column !important;
+    align-items: center !important;
     width: 100% !important;
     flex: 1;
     height: 100% !important;
@@ -1539,11 +1544,16 @@ html, body {
     width: 100%;
     display: flex;
     justify-content: center;
+    align-items: flex-start;
     overflow: visible;
+    flex-shrink: 0;
   }
 
   .paper-sheet {
     transform-origin: top center !important;
+    flex-shrink: 0 !important;
+    min-width: 680px !important;
+    max-width: 680px !important;
   }
 
   /* Standalone Step Containers (Steps 1, 2, 4) */
