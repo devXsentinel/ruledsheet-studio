@@ -1621,8 +1621,8 @@ export const PreviewStep: React.FC<Props> = ({
       {/* Center Canvas Viewport */}
       <main className="studio-canvas-viewport custom-scrollbar">
         
-        {/* Floating Top Pill Toolbar */}
-        <div className="canvas-floating-toolbar">
+        {/* Floating Top Pill Toolbar (Desktop Only) */}
+        <div className="canvas-floating-toolbar hide-on-mobile">
           
           {/* Mode Switcher */}
           <div className="toolbar-group">
@@ -1718,6 +1718,65 @@ export const PreviewStep: React.FC<Props> = ({
             </button>
           </div>
 
+        </div>
+
+        {/* Mobile Floating Action Dock (Compact & Thumb Friendly) */}
+        <div className="mobile-preview-dock show-on-mobile" aria-label="Mobile Paper Controls">
+          <div className="mobile-dock-group">
+            <button
+              onClick={() => setCurrentPage(p => Math.max(0, p - 1))}
+              disabled={safeCurrentPage === 0}
+              className="mobile-dock-btn"
+              aria-label="Previous Page"
+            >
+              <ChevronLeft size={16} />
+            </button>
+            <span className="mobile-dock-page-badge">
+              {safeCurrentPage + 1} / {totalPages}
+            </span>
+            <button
+              onClick={() => setCurrentPage(p => Math.min(totalPages - 1, p + 1))}
+              disabled={safeCurrentPage >= totalPages - 1}
+              className="mobile-dock-btn"
+              aria-label="Next Page"
+            >
+              <ChevronRight size={16} />
+            </button>
+          </div>
+
+          <div className="mobile-dock-divider" />
+
+          {/* Mode switch */}
+          <button
+            onClick={() => setPreviewMode(m => m === 'sheet' ? 'print' : 'sheet')}
+            className={`mobile-dock-btn ${previewMode === 'print' ? 'active' : ''}`}
+            title="Toggle between Sheet and Print-Ready preview"
+          >
+            {previewMode === 'sheet' ? <Eye size={15} /> : <Printer size={15} />}
+            <span>{previewMode === 'sheet' ? 'Sheet' : 'Print'}</span>
+          </button>
+
+          {/* Fit zoom */}
+          <button
+            onClick={handleFitWidth}
+            className="mobile-dock-btn"
+            title="Fit paper to screen width"
+          >
+            <Maximize2 size={14} />
+            <span>Fit</span>
+          </button>
+
+          <div className="mobile-dock-divider" />
+
+          {/* Switch to controls */}
+          <button
+            onClick={() => setMobileView('controls')}
+            className="mobile-dock-btn mobile-dock-btn-highlight"
+            aria-label="Edit Style & Text"
+          >
+            <Sliders size={14} />
+            <span>Controls</span>
+          </button>
         </div>
 
         {/* The Paper Sheet Container */}
@@ -1967,6 +2026,82 @@ export const PreviewStep: React.FC<Props> = ({
                         </text>
                       );
                     })}
+                  </g>
+                );
+              })}
+
+              {/* Layer 3c: Diagrams & Images */}
+              {pageData.images?.map((img) => {
+                const isSelected = selectedBlockId === img.blockId;
+                const viewBoxMatch = img.svgContent?.match(/viewBox="([^"]+)"/);
+                const viewBox = viewBoxMatch ? viewBoxMatch[1] : undefined;
+                const innerSvg = img.svgContent
+                  ? img.svgContent.replace(/^<svg[^>]*>/, '').replace(/<\/svg>$/, '')
+                  : undefined;
+
+                return (
+                  <g key={img.id} className="paper-svg-image">
+                    <title>{img.caption || 'Diagram / Image'}</title>
+                    {isSelected && (
+                      <rect
+                        x={img.xMm - 1}
+                        y={img.yMm - 1}
+                        width={img.widthMm + 2}
+                        height={img.heightMm + 2}
+                        rx="1"
+                        fill="rgba(59, 130, 246, 0.12)"
+                        stroke="#3b82f6"
+                        strokeWidth="0.4"
+                        strokeDasharray="1.5 1"
+                        style={{ pointerEvents: 'none' }}
+                      />
+                    )}
+                    {innerSvg && viewBox ? (
+                      <svg
+                        x={img.xMm}
+                        y={img.yMm}
+                        width={img.widthMm}
+                        height={img.heightMm}
+                        viewBox={viewBox}
+                        preserveAspectRatio={img.isMatrix ? "none" : "xMidYMid meet"}
+                        dangerouslySetInnerHTML={{ __html: innerSvg }}
+                        onClick={() => {
+                          setSelectedBlockId(isSelected ? null : img.blockId);
+                          setActiveTab('content');
+                        }}
+                        style={{
+                          cursor: 'pointer',
+                          overflow: 'visible',
+                          fontFamily: `'${settings.fontFamily}', cursive, sans-serif`
+                        }}
+                      />
+                    ) : (
+                      <image
+                        href={img.imageUrl}
+                        x={img.xMm}
+                        y={img.yMm}
+                        width={img.widthMm}
+                        height={img.heightMm}
+                        preserveAspectRatio={img.isMatrix ? "none" : "xMidYMid meet"}
+                        onClick={() => {
+                          setSelectedBlockId(isSelected ? null : img.blockId);
+                          setActiveTab('content');
+                        }}
+                        style={{ cursor: 'pointer', mixBlendMode: 'multiply' }}
+                      />
+                    )}
+                    {img.caption && img.caption.trim().length > 0 && !img.isMatrix && (
+                      <text
+                        x={img.xMm + img.widthMm / 2}
+                        y={img.yMm + img.heightMm + 3.5}
+                        fontSize="3.2"
+                        fontFamily={`"${settings.fontFamily}", cursive, sans-serif`}
+                        fill="#000000"
+                        textAnchor="middle"
+                      >
+                        {img.caption}
+                      </text>
+                    )}
                   </g>
                 );
               })}

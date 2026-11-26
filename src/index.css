@@ -320,6 +320,39 @@ body:has(.studio-layout) {
   gap: 0.5rem;
 }
 
+/* Mobile Bottom Navigation & Action Bar (Hidden on Desktop) */
+.mobile-bottom-nav {
+  display: none !important;
+}
+
+.mobile-bottom-action-bar {
+  display: none !important;
+}
+
+.mobile-preview-dock {
+  display: none !important;
+}
+
+.printer-instruction-callout {
+  padding: 1.25rem 1.5rem;
+  border-radius: var(--radius-xl);
+  background: rgba(239, 68, 68, 0.08);
+  border: 1px solid rgba(239, 68, 68, 0.35);
+  display: flex;
+  flex-direction: column;
+  gap: 0.85rem;
+}
+
+.printer-instruction-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.printer-instruction-body {
+  display: block;
+}
+
 /* ==========================================================================
    BUTTONS & BADGES
    ========================================================================== */
@@ -633,6 +666,17 @@ body:has(.studio-layout) {
 
 .paper-svg-line.selected {
   font-weight: 600;
+}
+
+.paper-svg-image {
+  cursor: pointer;
+}
+
+.paper-svg-image svg text,
+.paper-svg-image svg tspan,
+.paper-svg-image text,
+.paper-svg-image tspan {
+  font-family: inherit;
 }
 
 /* ==========================================================================
@@ -1131,6 +1175,12 @@ html, body {
   .app-navbar {
     padding: 0.5rem 0.75rem;
     gap: 0.4rem;
+    justify-content: space-between;
+  }
+
+  /* On mobile, steps are in bottom nav bar */
+  .app-navbar .nav-steps {
+    display: none !important;
   }
 
   .nav-brand {
@@ -1146,33 +1196,206 @@ html, body {
     font-size: 0.9375rem;
   }
 
-  .nav-steps {
-    padding: 0.15rem;
-    gap: 0.15rem;
-  }
-
-  .nav-step-btn {
-    padding: 0.3rem 0.45rem;
-    font-size: 0.75rem;
-    border-radius: var(--radius-md);
-  }
-
-  .step-label-full {
-    display: none;
-  }
-
-  .step-label-short {
-    display: inline;
-  }
-
   .nav-actions {
-    gap: 0.25rem;
+    gap: 0.35rem;
   }
 
   .nav-btn-calibrator,
   .nav-btn-export {
-    padding: 0.35rem 0.5rem;
+    padding: 0.35rem 0.6rem;
     font-size: 0.75rem;
+    min-height: 34px;
+  }
+
+  /* Mobile Bottom Navigation Bar */
+  .mobile-bottom-nav {
+    display: flex !important;
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    z-index: 95;
+    height: calc(56px + env(safe-area-inset-bottom, 0px));
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+    background: rgba(11, 15, 23, 0.96);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    border-top: 1px solid var(--border-medium);
+    box-shadow: 0 -4px 16px rgba(0, 0, 0, 0.5);
+    align-items: stretch;
+  }
+
+  .mobile-nav-item {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 2px;
+    padding: 4px 0;
+    color: var(--text-muted);
+    background: transparent;
+    border: none;
+    cursor: pointer;
+    touch-action: manipulation;
+    -webkit-tap-highlight-color: transparent;
+    transition: all 0.15s ease;
+  }
+
+  .mobile-nav-item:active {
+    transform: scale(0.95);
+  }
+
+  .mobile-nav-item.active {
+    color: #60a5fa;
+  }
+
+  .mobile-nav-icon-wrap {
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 26px;
+    height: 26px;
+  }
+
+  .mobile-nav-dot {
+    position: absolute;
+    top: 2px;
+    right: 2px;
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: #10b981;
+    box-shadow: 0 0 6px rgba(16, 185, 129, 0.8);
+  }
+
+  .mobile-nav-label {
+    font-size: 0.6875rem;
+    font-weight: 600;
+  }
+
+  .mobile-nav-item.active .mobile-nav-label {
+    font-weight: 700;
+    color: #ffffff;
+  }
+
+  /* Sticky Mobile Action Bar for Steps 1 & 2 */
+  .mobile-bottom-action-bar {
+    display: flex !important;
+    position: fixed;
+    bottom: calc(56px + env(safe-area-inset-bottom, 0px));
+    left: 0;
+    right: 0;
+    z-index: 90;
+    padding: 0.65rem 1rem;
+    background: rgba(11, 15, 23, 0.94);
+    backdrop-filter: blur(14px);
+    -webkit-backdrop-filter: blur(14px);
+    border-top: 1px solid var(--border-medium);
+    box-shadow: 0 -4px 12px rgba(0, 0, 0, 0.35);
+  }
+
+  /* Mobile Preview Dock */
+  .mobile-preview-dock {
+    display: inline-flex !important;
+    position: fixed;
+    bottom: calc(68px + env(safe-area-inset-bottom, 0px));
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 40;
+    background: rgba(15, 23, 42, 0.94);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    border: 1px solid var(--border-medium);
+    border-radius: 9999px;
+    padding: 5px 8px;
+    gap: 6px;
+    align-items: center;
+    box-shadow: 0 10px 25px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(255, 255, 255, 0.08);
+    max-width: calc(100vw - 20px);
+    white-space: nowrap;
+  }
+
+  .mobile-dock-group {
+    display: flex;
+    align-items: center;
+    gap: 2px;
+  }
+
+  .mobile-dock-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 4px;
+    padding: 6px 10px;
+    border-radius: 9999px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: var(--text-main);
+    background: rgba(255, 255, 255, 0.06);
+    border: 1px solid transparent;
+    cursor: pointer;
+    touch-action: manipulation;
+    transition: all 0.15s ease;
+  }
+
+  .mobile-dock-btn:active {
+    transform: scale(0.96);
+  }
+
+  .mobile-dock-btn.active {
+    background: var(--accent-gradient);
+    color: #ffffff;
+    box-shadow: 0 2px 8px rgba(59, 130, 246, 0.4);
+  }
+
+  .mobile-dock-btn-highlight {
+    background: rgba(59, 130, 246, 0.2);
+    border-color: rgba(59, 130, 246, 0.4);
+    color: #60a5fa;
+  }
+
+  .mobile-dock-page-badge {
+    font-size: 0.75rem;
+    font-family: 'JetBrains Mono', monospace;
+    font-weight: 700;
+    color: #ffffff;
+    padding: 0 4px;
+  }
+
+  .mobile-dock-divider {
+    width: 1px;
+    height: 18px;
+    background: var(--border-subtle);
+  }
+
+  /* Printer Collapsible Notice on Mobile */
+  .printer-instruction-body {
+    display: none;
+    margin-top: 0.75rem;
+  }
+
+  .printer-instruction-body.mobile-expanded {
+    display: block;
+    animation: fadeIn 0.2s ease-in;
+  }
+
+  /* Modal Footer on Mobile */
+  .modal-footer {
+    flex-direction: column !important;
+    text-align: center !important;
+    gap: 0.35rem !important;
+    font-size: 0.6875rem !important;
+    padding: 0.65rem 0.75rem !important;
+  }
+
+  /* Input fields: 16px to prevent iOS Safari auto-zoom */
+  input[type="text"],
+  input[type="number"],
+  select,
+  textarea {
+    font-size: 16px !important;
   }
 
   /* Studio Layout: Switch between Paper View & Controls View */

@@ -12,7 +12,9 @@ import {
   Info,
   RotateCcw,
   Sliders,
-  FileCheck2
+  FileCheck2,
+  Share2,
+  ChevronDown
 } from 'lucide-react';
 
 interface Props {
@@ -33,6 +35,41 @@ export const ExportStep: React.FC<Props> = ({
   const [isExportingPreview, setIsExportingPreview] = useState(false);
   const [isExportingPrint, setIsExportingPrint] = useState(false);
   const [isExportingTest, setIsExportingTest] = useState(false);
+  const [isSharingPreview, setIsSharingPreview] = useState(false);
+  const [isSharingPrint, setIsSharingPrint] = useState(false);
+  const [isPrinterGuideExpanded, setIsPrinterGuideExpanded] = useState(false);
+
+  const canShare = typeof navigator !== 'undefined' && typeof navigator.share === 'function';
+
+  const handleShare = async (isPrintOnly: boolean) => {
+    if (isPrintOnly) setIsSharingPrint(true);
+    else setIsSharingPreview(true);
+
+    try {
+      const pdfBytes = await generateHandwritingPdf(layout, template, settings, !isPrintOnly);
+      const filename = isPrintOnly
+        ? `Assignment_Print_TextOnly_${template.paperSize}.pdf`
+        : `Assignment_Preview_${template.paperSize}.pdf`;
+      const file = new File([pdfBytes as any], filename, { type: 'application/pdf' });
+      if (navigator.canShare && navigator.canShare({ files: [file] })) {
+        await navigator.share({
+          files: [file],
+          title: filename,
+          text: 'Generated Handwritten Assignment PDF'
+        });
+        confetti({ particleCount: 50, spread: 60, origin: { y: 0.7 } });
+      } else {
+        downloadPdf(pdfBytes, filename);
+      }
+    } catch (err: any) {
+      if (err?.name !== 'AbortError') {
+        alert(`Share error: ${err?.message || 'Could not share PDF'}`);
+      }
+    } finally {
+      if (isPrintOnly) setIsSharingPrint(false);
+      else setIsSharingPreview(false);
+    }
+  };
 
   const handleExportPreview = async () => {
     setIsExportingPreview(true);
@@ -105,55 +142,186 @@ export const ExportStep: React.FC<Props> = ({
         </p>
       </div>
 
-      {/* Critical Printing Instructions Callout */}
-      <div style={{
-        padding: '1.25rem 1.5rem',
-        borderRadius: 'var(--radius-xl)',
-        background: 'rgba(239, 68, 68, 0.08)',
-        border: '1px solid rgba(239, 68, 68, 0.35)',
-        display: 'flex',
-        flexDirection: 'column',
-        gap: '0.85rem'
-      }}>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+      {/* Two Export Options - Placed First for Immediate Mobile Access */}
+      <div className="grid-two-cols export-cards-grid">
+        
+        {/* Card 1: Print-Ready PDF (Text Only) */}
+        <div className="export-card featured">
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <div className="export-card-icon">
+                <Printer size={26} />
+              </div>
+              <span className="pill-badge pill-badge-blue" style={{ background: '#2563eb', color: '#ffffff', border: 'none' }}>
+                Primary For Printing
+              </span>
+            </div>
+
+            <div>
+              <h2 className="export-card-title">Export Print PDF (Text Only)</h2>
+              <p className="export-card-desc">
+                Contains <strong>only your handwritten text</strong> on a clean transparent background. No sheet photograph, no ruled lines, no university logo.
+              </p>
+            </div>
+
+            <ul className="export-checklist" style={{ marginTop: '0.5rem' }}>
+              <li>
+                <CheckCircle2 size={16} color="#10b981" />
+                <span>Zero template pixels or paper background</span>
+              </li>
+              <li>
+                <CheckCircle2 size={16} color="#10b981" />
+                <span>Feeds into printer with real pre-printed ruled sheets</span>
+              </li>
+              <li>
+                <CheckCircle2 size={16} color="#10b981" />
+                <span>Line 1 starts at 53.20mm (cleanly below header double rule)</span>
+              </li>
+              <li>
+                <CheckCircle2 size={16} color="#10b981" />
+                <span>{layout.totalPageCount} page{layout.totalPageCount > 1 ? 's' : ''} &bull; Exact 7.28mm line pitch</span>
+              </li>
+            </ul>
+          </div>
+
+          <div style={{ display: 'flex', gap: '0.5rem', marginTop: '1rem' }}>
+            <button
+              onClick={handleExportPrint}
+              disabled={isExportingPrint}
+              className="btn btn-primary btn-lg"
+              style={{ flex: 1, justifyContent: 'center' }}
+            >
+              <Download size={18} />
+              {isExportingPrint ? 'Generating...' : 'Download Print PDF (Text Only)'}
+            </button>
+            {canShare && (
+              <button
+                onClick={() => handleShare(true)}
+                disabled={isSharingPrint}
+                className="btn btn-secondary btn-lg"
+                style={{ padding: '0 0.85rem' }}
+                title="Share or Save PDF"
+              >
+                <Share2 size={18} />
+              </button>
+            )}
+          </div>
+        </div>
+
+        {/* Card 2: Preview PDF (With Background) */}
+        <div className="export-card">
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <div className="export-card-icon" style={{ background: 'rgba(255, 255, 255, 0.08)', color: '#ffffff', borderColor: 'rgba(255, 255, 255, 0.15)' }}>
+                <Eye size={26} />
+              </div>
+              <span className="pill-badge pill-badge-blue">
+                Digital Submission
+              </span>
+            </div>
+
+            <div>
+              <h2 className="export-card-title">Export Preview PDF (With Sheet)</h2>
+              <p className="export-card-desc">
+                Renders handwritten text directly onto the <strong>calibrated ruled paper template</strong>. Ideal for online classroom submission or verification.
+              </p>
+            </div>
+
+            <ul className="export-checklist" style={{ marginTop: '0.5rem' }}>
+              <li>
+                <CheckCircle2 size={16} color="#60a5fa" />
+                <span>Includes university logo, header, and ruled lines</span>
+              </li>
+              <li>
+                <CheckCircle2 size={16} color="#60a5fa" />
+                <span>Matches on-screen studio preview 1:1</span>
+              </li>
+              <li>
+                <CheckCircle2 size={16} color="#60a5fa" />
+                <span>Complete self-contained assignment document</span>
+              </li>
+            </ul>
+          </div>
+
+          <div style={{ display: 'flex', gap: '0.5rem', marginTop: '1rem' }}>
+            <button
+              onClick={handleExportPreview}
+              disabled={isExportingPreview}
+              className="btn btn-secondary btn-lg"
+              style={{ flex: 1, justifyContent: 'center' }}
+            >
+              <Download size={18} />
+              {isExportingPreview ? 'Generating...' : 'Download Preview PDF (With Sheet)'}
+            </button>
+            {canShare && (
+              <button
+                onClick={() => handleShare(false)}
+                disabled={isSharingPreview}
+                className="btn btn-secondary btn-lg"
+                style={{ padding: '0 0.85rem' }}
+                title="Share or Save PDF"
+              >
+                <Share2 size={18} />
+              </button>
+            )}
+          </div>
+        </div>
+
+      </div>
+
+      {/* Critical Printing Instructions Callout (Collapsible on Mobile) */}
+      <div className="printer-instruction-callout">
+        <div
+          className="printer-instruction-header"
+          onClick={() => setIsPrinterGuideExpanded(!isPrinterGuideExpanded)}
+          style={{ cursor: 'pointer' }}
+        >
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', color: '#fca5a5', fontWeight: 800, fontSize: '0.95rem' }}>
             <AlertTriangle size={20} color="#ef4444" style={{ flexShrink: 0 }} />
             <span>CRITICAL PRINTER SETUP &bull; Prevent Text Misalignment</span>
           </div>
-          <button
-            onClick={handleExportTest}
-            disabled={isExportingTest}
-            className="btn btn-secondary btn-sm"
-            style={{ fontSize: '0.75rem', borderColor: 'rgba(239, 68, 68, 0.4)', color: '#fca5a5' }}
-            title="Print a 1-page test sheet to verify printer feeding before printing your whole assignment"
-          >
-            <FileCheck2 size={14} color="#ef4444" />
-            {isExportingTest ? 'Preparing Test...' : 'Download 1-Page Test Sheet'}
-          </button>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+            <button
+              onClick={(e) => { e.stopPropagation(); handleExportTest(); }}
+              disabled={isExportingTest}
+              className="btn btn-secondary btn-sm"
+              style={{ fontSize: '0.75rem', borderColor: 'rgba(239, 68, 68, 0.4)', color: '#fca5a5' }}
+              title="Print a 1-page test sheet to verify printer feeding before printing your whole assignment"
+            >
+              <FileCheck2 size={14} color="#ef4444" />
+              <span className="hide-on-mobile">{isExportingTest ? 'Preparing Test...' : 'Download 1-Page Test Sheet'}</span>
+              <span className="show-on-mobile">Test Sheet</span>
+            </button>
+            <span className="show-on-mobile" style={{ color: '#fca5a5' }}>
+              <ChevronDown size={18} style={{ transform: isPrinterGuideExpanded ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s' }} />
+            </span>
+          </div>
         </div>
 
-        <div style={{ fontSize: '0.8125rem', color: '#fecaca', lineHeight: 1.6 }}>
-          When printing the <strong>Text Only PDF</strong> onto your physical ruled sheets, your printer driver MUST NOT scale or resize the document:
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(230px, 1fr))', gap: '0.75rem', marginTop: '0.65rem' }}>
-            <div style={{ background: 'rgba(0, 0, 0, 0.35)', padding: '0.65rem 0.85rem', borderRadius: 'var(--radius-md)', border: '1px solid rgba(239, 68, 68, 0.25)' }}>
-              <div style={{ color: '#ef4444', fontWeight: 800, fontSize: '0.75rem', marginBottom: '0.2rem' }}>1. PRINT SCALE SETTING</div>
-              <div style={{ fontSize: '0.75rem', color: '#ffffff' }}>
-                Select <strong>&quot;Actual Size&quot;</strong> or <strong>100%</strong>.<br />
-                <span style={{ color: '#f87171' }}>NEVER select &quot;Fit to Page&quot; or &quot;Fit to Printable Area&quot;</span> (that shrinks the page by ~4% and displaces the lines).
+        <div className={`printer-instruction-body ${isPrinterGuideExpanded ? 'mobile-expanded' : ''}`}>
+          <div style={{ fontSize: '0.8125rem', color: '#fecaca', lineHeight: 1.6 }}>
+            When printing the <strong>Text Only PDF</strong> onto your physical ruled sheets, your printer driver MUST NOT scale or resize the document:
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(230px, 1fr))', gap: '0.75rem', marginTop: '0.65rem' }}>
+              <div style={{ background: 'rgba(0, 0, 0, 0.35)', padding: '0.65rem 0.85rem', borderRadius: 'var(--radius-md)', border: '1px solid rgba(239, 68, 68, 0.25)' }}>
+                <div style={{ color: '#ef4444', fontWeight: 800, fontSize: '0.75rem', marginBottom: '0.2rem' }}>1. PRINT SCALE SETTING</div>
+                <div style={{ fontSize: '0.75rem', color: '#ffffff' }}>
+                  Select <strong>&quot;Actual Size&quot;</strong> or <strong>100%</strong>.<br />
+                  <span style={{ color: '#f87171' }}>NEVER select &quot;Fit to Page&quot; or &quot;Fit to Printable Area&quot;</span> (that shrinks the page by ~4% and displaces the lines).
+                </div>
               </div>
-            </div>
 
-            <div style={{ background: 'rgba(0, 0, 0, 0.35)', padding: '0.65rem 0.85rem', borderRadius: 'var(--radius-md)', border: '1px solid rgba(239, 68, 68, 0.25)' }}>
-              <div style={{ color: '#ef4444', fontWeight: 800, fontSize: '0.75rem', marginBottom: '0.2rem' }}>2. PAPER SIZE</div>
-              <div style={{ fontSize: '0.75rem', color: '#ffffff' }}>
-                Ensure paper size is set to <strong>A4</strong> (210 &times; 297 mm) in your printer dialog, not US Letter.
+              <div style={{ background: 'rgba(0, 0, 0, 0.35)', padding: '0.65rem 0.85rem', borderRadius: 'var(--radius-md)', border: '1px solid rgba(239, 68, 68, 0.25)' }}>
+                <div style={{ color: '#ef4444', fontWeight: 800, fontSize: '0.75rem', marginBottom: '0.2rem' }}>2. PAPER SIZE</div>
+                <div style={{ fontSize: '0.75rem', color: '#ffffff' }}>
+                  Ensure paper size is set to <strong>A4</strong> (210 &times; 297 mm) in your printer dialog, not US Letter.
+                </div>
               </div>
-            </div>
 
-            <div style={{ background: 'rgba(0, 0, 0, 0.35)', padding: '0.65rem 0.85rem', borderRadius: 'var(--radius-md)', border: '1px solid rgba(239, 68, 68, 0.25)' }}>
-              <div style={{ color: '#ef4444', fontWeight: 800, fontSize: '0.75rem', marginBottom: '0.2rem' }}>3. PRINTER TRAY ALIGNMENT</div>
-              <div style={{ fontSize: '0.75rem', color: '#ffffff' }}>
-                Snug the paper tray guides against the A4 sheets so paper feeds straight without skew.
+              <div style={{ background: 'rgba(0, 0, 0, 0.35)', padding: '0.65rem 0.85rem', borderRadius: 'var(--radius-md)', border: '1px solid rgba(239, 68, 68, 0.25)' }}>
+                <div style={{ color: '#ef4444', fontWeight: 800, fontSize: '0.75rem', marginBottom: '0.2rem' }}>3. PRINTER TRAY ALIGNMENT</div>
+                <div style={{ fontSize: '0.75rem', color: '#ffffff' }}>
+                  Snug the paper tray guides against the A4 sheets so paper feeds straight without skew.
+                </div>
               </div>
             </div>
           </div>
@@ -204,106 +372,6 @@ export const ExportStep: React.FC<Props> = ({
         </div>
       )}
 
-      {/* Two Export Options */}
-      <div className="grid-two-cols">
-        
-        {/* Card 1: Print-Ready PDF (Text Only) */}
-        <div className="export-card featured">
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-              <div className="export-card-icon">
-                <Printer size={26} />
-              </div>
-              <span className="pill-badge pill-badge-blue" style={{ background: '#2563eb', color: '#ffffff', border: 'none' }}>
-                Primary For Printing
-              </span>
-            </div>
-
-            <div>
-              <h2 className="export-card-title">Export Print PDF (Text Only)</h2>
-              <p className="export-card-desc">
-                Contains <strong>only your handwritten text</strong> on a clean transparent background. No sheet photograph, no ruled lines, no university logo.
-              </p>
-            </div>
-
-            <ul className="export-checklist" style={{ marginTop: '0.5rem' }}>
-              <li>
-                <CheckCircle2 size={16} color="#10b981" />
-                <span>Zero template pixels or paper background</span>
-              </li>
-              <li>
-                <CheckCircle2 size={16} color="#10b981" />
-                <span>Feeds into printer with real pre-printed ruled sheets</span>
-              </li>
-              <li>
-                <CheckCircle2 size={16} color="#10b981" />
-                <span>Line 1 starts at 53.20mm (cleanly below header double rule)</span>
-              </li>
-              <li>
-                <CheckCircle2 size={16} color="#10b981" />
-                <span>{layout.totalPageCount} page{layout.totalPageCount > 1 ? 's' : ''} &bull; Exact 7.28mm line pitch</span>
-              </li>
-            </ul>
-          </div>
-
-          <button
-            onClick={handleExportPrint}
-            disabled={isExportingPrint}
-            className="btn btn-primary btn-lg"
-            style={{ width: '100%', marginTop: '1rem' }}
-          >
-            <Download size={18} />
-            {isExportingPrint ? 'Generating Print PDF...' : 'Download Print PDF (Text Only)'}
-          </button>
-        </div>
-
-        {/* Card 2: Preview PDF (With Background) */}
-        <div className="export-card">
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-              <div className="export-card-icon" style={{ background: 'rgba(255, 255, 255, 0.08)', color: '#ffffff', borderColor: 'rgba(255, 255, 255, 0.15)' }}>
-                <Eye size={26} />
-              </div>
-              <span className="pill-badge pill-badge-blue">
-                Digital Submission
-              </span>
-            </div>
-
-            <div>
-              <h2 className="export-card-title">Export Preview PDF (With Sheet)</h2>
-              <p className="export-card-desc">
-                Renders handwritten text directly onto the <strong>calibrated ruled paper template</strong>. Ideal for online classroom submission or verification.
-              </p>
-            </div>
-
-            <ul className="export-checklist" style={{ marginTop: '0.5rem' }}>
-              <li>
-                <CheckCircle2 size={16} color="#60a5fa" />
-                <span>Includes university logo, header, and ruled lines</span>
-              </li>
-              <li>
-                <CheckCircle2 size={16} color="#60a5fa" />
-                <span>Matches on-screen studio preview 1:1</span>
-              </li>
-              <li>
-                <CheckCircle2 size={16} color="#60a5fa" />
-                <span>Complete self-contained assignment document</span>
-              </li>
-            </ul>
-          </div>
-
-          <button
-            onClick={handleExportPreview}
-            disabled={isExportingPreview}
-            className="btn btn-secondary btn-lg"
-            style={{ width: '100%', marginTop: '1rem' }}
-          >
-            <Download size={18} />
-            {isExportingPreview ? 'Generating Preview PDF...' : 'Download Preview PDF (With Sheet)'}
-          </button>
-        </div>
-
-      </div>
 
       {/* Layout Details */}
       <div className="control-card" style={{ gap: '1rem' }}>

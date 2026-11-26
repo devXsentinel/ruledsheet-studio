@@ -1,6 +1,7 @@
 import React, { useState, useRef } from 'react';
 import { DocumentBlock, DocxImportSummary, BlockType } from '../types';
 import { parseDocxFile, parsePlainText, SAMPLE_ASSIGNMENT_TEXT } from '../utils/docxParser';
+import { removeImageBackground } from '../utils/flowchartGenerator';
 import {
   FileText,
   Upload,
@@ -11,7 +12,10 @@ import {
   Trash2,
   FileCode,
   Edit3,
-  Table
+  Table,
+  Image as ImageIcon,
+  Wand2,
+  Undo2
 } from 'lucide-react';
 
 interface Props {
@@ -31,7 +35,88 @@ export const DocumentStep: React.FC<Props> = ({
   const [isLoading, setIsLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [editingBlockId, setEditingBlockId] = useState<string | null>(null);
+  const [importMode, setImportMode] = useState<'upload' | 'paste'>('upload');
+  const [pastedText, setPastedText] = useState('');
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const imageFileInputRef = useRef<HTMLInputElement>(null);
+
+  const handleProcessPastedText = () => {
+    if (!pastedText.trim()) return;
+    setIsLoading(true);
+    setErrorMsg(null);
+    try {
+      const parsedBlocks = parsePlainText(pastedText);
+      const wordCount = parsedBlocks.reduce((acc, b) => acc + b.text.split(/\s+/).filter(Boolean).length, 0);
+      const summary: DocxImportSummary = {
+        fileName: 'Pasted_Assignment.docx',
+        fileSizeBytes: pastedText.length,
+        paragraphCount: parsedBlocks.length,
+        wordCount,
+        questionsDetected: parsedBlocks.filter(b => b.type === 'question' || b.type === 'heading').length,
+        answersDetected: parsedBlocks.filter(b => b.type === 'answer').length,
+        tablesDetected: parsedBlocks.filter(b => b.type === 'table').length
+      };
+      onUpdateBlocks(parsedBlocks, summary);
+    } catch (err: any) {
+      setErrorMsg(err?.message || 'Failed to parse text.');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = async (event) => {
+      const dataUrl = event.target?.result as string;
+      if (dataUrl) {
+        // Automatically make white/light backgrounds transparent so only text/drawings sit on ruled lines
+        const transparentUrl = await removeImageBackground(dataUrl);
+        const newBlock: DocumentBlock = {
+          id: `block_img_${Date.now()}`,
+          type: 'image',
+          text: file.name.replace(/\.[^/.]+$/, ''),
+          indentMm: 0,
+          imageUrl: transparentUrl,
+          originalImageUrl: dataUrl,
+          isTransparentBg: true,
+          imageWidthMm: 135,
+          imageHeightMm: 70,
+          caption: file.name.replace(/\.[^/.]+$/, '')
+        };
+        onUpdateBlocks([...blocks, newBlock], summary || undefined);
+      }
+    };
+    reader.readAsDataURL(file);
+    e.target.value = '';
+  };
+
+  const handleToggleBackgroundTransparency = async (blockId: string) => {
+    const targetBlock = blocks.find(b => b.id === blockId);
+    if (!targetBlock || !targetBlock.imageUrl) return;
+
+    if (targetBlock.isTransparentBg && targetBlock.originalImageUrl) {
+      // Revert to original opaque background
+      const updated = blocks.map(b => b.id === blockId ? {
+        ...b,
+        imageUrl: b.originalImageUrl,
+        isTransparentBg: false
+      } : b);
+      onUpdateBlocks(updated, summary || undefined);
+    } else {
+      // Remove white/light background leaving text and ink strokes only
+      const orig = targetBlock.originalImageUrl || targetBlock.imageUrl;
+      const transparentUrl = await removeImageBackground(orig);
+      const updated = blocks.map(b => b.id === blockId ? {
+        ...b,
+        imageUrl: transparentUrl,
+        originalImageUrl: orig,
+        isTransparentBg: true
+      } : b);
+      onUpdateBlocks(updated, summary || undefined);
+    }
+  };
 
   const handleProcessFile = async (file: File) => {
     setIsLoading(true);
@@ -73,7 +158,9 @@ export const DocumentStep: React.FC<Props> = ({
     const updated: DocumentBlock[] = blocks.map(b => {
       if (b.id !== blockId) return b;
       let nextType: BlockType;
-      if (b.tableData) {
+      if (b.imageUrl || b.type === 'image') {
+        nextType = b.type === 'image' ? 'normal' : 'image';
+      } else if (b.tableData) {
         nextType = b.type === 'table' ? 'answer' : 'table';
       } else {
         nextType = b.type === 'question' ? 'answer' : b.type === 'answer' ? 'normal' : 'question';
@@ -149,77 +236,152 @@ export const DocumentStep: React.FC<Props> = ({
         </span>
         <h1 className="step-hero-title">Import Word (.docx) Document</h1>
         <p className="step-hero-desc">
-          Upload your assignment file. The smart classifier automatically distinguishes questions from answers: <strong>Questions in black ink</strong>, <strong>Answers in blue ink</strong>.
+          Upload your assignment file. The smart classifier automatically distinguishes questions from answers: <strong>Questions in black ink</strong>, <strong>Answers in blue ink</strong>, and renders <strong>Flowcharts in their true 2D orientation</strong>.
         </p>
       </div>
 
-      {/* Upload Dropzone */}
-      <div
-        onDragOver={(e) => { e.preventDefault(); setIsDragging(true); }}
-        onDragLeave={() => setIsDragging(false)}
-        onDrop={handleDrop}
-        onClick={() => fileInputRef.current?.click()}
-        style={{
-          border: isDragging ? '2px dashed var(--accent-primary)' : '2px dashed var(--border-medium)',
+      {/* Import Mode Tabs */}
+      <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '1rem' }}>
+        <button
+          type="button"
+          onClick={() => setImportMode('upload')}
+          className={`btn ${importMode === 'upload' ? 'btn-primary' : 'btn-secondary'}`}
+          style={{ gap: '0.4rem', fontSize: '0.8125rem' }}
+        >
+          <Upload size={14} />
+          Upload Word (.docx)
+        </button>
+        <button
+          type="button"
+          onClick={() => setImportMode('paste')}
+          className={`btn ${importMode === 'paste' ? 'btn-primary' : 'btn-secondary'}`}
+          style={{ gap: '0.4rem', fontSize: '0.8125rem' }}
+        >
+          <FileText size={14} />
+          Paste Document Text / Flowchart
+        </button>
+      </div>
+
+      {importMode === 'upload' ? (
+        /* Upload Dropzone */
+        <div
+          onDragOver={(e) => { e.preventDefault(); setIsDragging(true); }}
+          onDragLeave={() => setIsDragging(false)}
+          onDrop={handleDrop}
+          onClick={() => fileInputRef.current?.click()}
+          style={{
+            border: isDragging ? '2px dashed var(--accent-primary)' : '2px dashed var(--border-medium)',
+            borderRadius: 'var(--radius-xl)',
+            padding: '2.5rem 1.5rem',
+            textAlign: 'center',
+            cursor: 'pointer',
+            background: isDragging ? 'rgba(59, 130, 246, 0.08)' : 'var(--bg-card)',
+            transition: 'all 0.2s ease',
+            boxShadow: isDragging ? 'var(--shadow-lg)' : 'none'
+          }}
+        >
+          <input
+            type="file"
+            ref={fileInputRef}
+            onChange={(e) => e.target.files?.[0] && handleProcessFile(e.target.files[0])}
+            accept=".docx,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+            style={{ display: 'none' }}
+          />
+
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.85rem' }}>
+            <div
+              style={{
+                width: '56px',
+                height: '56px',
+                borderRadius: 'var(--radius-lg)',
+                background: 'rgba(59, 130, 246, 0.15)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                color: 'var(--accent-primary)',
+                border: '1px solid rgba(59, 130, 246, 0.3)'
+              }}
+            >
+              <Upload size={28} />
+            </div>
+
+            <div>
+              <div style={{ fontSize: '1rem', fontWeight: 700, color: '#ffffff' }}>
+                {isLoading ? 'Extracting paragraphs & Q&A structure...' : 'Click or Drag & Drop your Word (.docx) file here'}
+              </div>
+              <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '0.25rem' }}>
+                Supports Microsoft Word (.docx) &bull; Processed 100% locally on your computer
+              </div>
+            </div>
+
+            <div style={{ marginTop: '0.5rem' }}>
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleLoadSample();
+                }}
+                className="btn btn-secondary btn-sm"
+                style={{ color: '#60a5fa' }}
+              >
+                <FileCode size={15} />
+                Load Sample Assignment Text
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : (
+        /* Paste Mode */
+        <div style={{
+          background: 'var(--bg-card)',
+          border: '1px solid var(--border-medium)',
           borderRadius: 'var(--radius-xl)',
-          padding: '2.5rem 1.5rem',
-          textAlign: 'center',
-          cursor: 'pointer',
-          background: isDragging ? 'rgba(59, 130, 246, 0.08)' : 'var(--bg-card)',
-          transition: 'all 0.2s ease',
-          boxShadow: isDragging ? 'var(--shadow-lg)' : 'none'
-        }}
-      >
-        <input
-          type="file"
-          ref={fileInputRef}
-          onChange={(e) => e.target.files?.[0] && handleProcessFile(e.target.files[0])}
-          accept=".docx,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
-          style={{ display: 'none' }}
-        />
-
-        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.85rem' }}>
-          <div
-            style={{
-              width: '56px',
-              height: '56px',
-              borderRadius: 'var(--radius-lg)',
-              background: 'rgba(59, 130, 246, 0.15)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              color: 'var(--accent-primary)',
-              border: '1px solid rgba(59, 130, 246, 0.3)'
-            }}
-          >
-            <Upload size={28} />
-          </div>
-
+          padding: '1.5rem',
+          display: 'flex',
+          flexDirection: 'column',
+          gap: '1rem'
+        }}>
           <div>
-            <div style={{ fontSize: '1rem', fontWeight: 700, color: '#ffffff' }}>
-              {isLoading ? 'Extracting paragraphs & Q&A structure...' : 'Click or Drag & Drop your Word (.docx) file here'}
+            <div style={{ fontSize: '0.9375rem', fontWeight: 700, color: '#ffffff' }}>
+              Paste Your Assignment Content
             </div>
-            <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '0.25rem' }}>
-              Supports Microsoft Word (.docx) &bull; Processed 100% locally on your computer
+            <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '0.2rem' }}>
+              Paste your assignment text with questions, answers, and flowcharts. The software automatically detects the flowchart and renders it in its true 2D orientation!
             </div>
           </div>
 
-          <div style={{ marginTop: '0.5rem' }}>
+          <textarea
+            value={pastedText}
+            onChange={(e) => setPastedText(e.target.value)}
+            rows={10}
+            placeholder="Paste your assignment text here..."
+            style={{
+              width: '100%',
+              background: 'var(--bg-app)',
+              border: '1px solid var(--border-medium)',
+              borderRadius: 'var(--radius-md)',
+              padding: '0.85rem',
+              fontSize: '0.8125rem',
+              color: '#ffffff',
+              fontFamily: 'JetBrains Mono, monospace',
+              resize: 'vertical'
+            }}
+          />
+
+          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.75rem' }}>
             <button
               type="button"
-              onClick={(e) => {
-                e.stopPropagation();
-                handleLoadSample();
-              }}
-              className="btn btn-secondary btn-sm"
-              style={{ color: '#60a5fa' }}
+              onClick={handleProcessPastedText}
+              disabled={isLoading || !pastedText.trim()}
+              className="btn btn-primary"
+              style={{ gap: '0.4rem' }}
             >
-              <FileCode size={15} />
-              Load Sample Assignment Text
+              <Sparkles size={15} />
+              {isLoading ? 'Converting & Formatting...' : 'Import Assignment & Detect Flowcharts'}
             </button>
           </div>
         </div>
-      </div>
+      )}
 
       {/* Error Message */}
       {errorMsg && (
@@ -261,6 +423,29 @@ export const DocumentStep: React.FC<Props> = ({
                   {blocks.filter(b => b.type === 'table').length} Table(s)
                 </span>
               )}
+              {blocks.filter(b => b.type === 'image' || b.imageUrl).length > 0 && (
+                <span className="pill-badge pill-badge-blue" style={{ background: 'rgba(168, 85, 247, 0.2)', color: '#c084fc', borderColor: 'rgba(168, 85, 247, 0.3)', display: 'inline-flex', alignItems: 'center', gap: '0.35rem' }}>
+                  <ImageIcon size={12} />
+                  {blocks.filter(b => b.type === 'image' || b.imageUrl).length} Diagram(s)
+                </span>
+              )}
+              <button
+                type="button"
+                onClick={() => imageFileInputRef.current?.click()}
+                className="btn btn-secondary btn-sm"
+                style={{ fontSize: '0.6875rem', padding: '2px 8px', display: 'inline-flex', alignItems: 'center', gap: '0.3rem' }}
+                title="Add a Flowchart or Diagram image"
+              >
+                <ImageIcon size={12} />
+                + Add Diagram Image
+              </button>
+              <input
+                type="file"
+                ref={imageFileInputRef}
+                onChange={handleImageUpload}
+                accept="image/*"
+                style={{ display: 'none' }}
+              />
             </div>
           </div>
 
@@ -271,6 +456,7 @@ export const DocumentStep: React.FC<Props> = ({
           {/* Blocks scrollable list */}
           <div style={{ maxHeight: '380px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '0.65rem', paddingRight: '0.5rem' }}>
             {blocks.map((block, idx) => {
+              const isImage = block.type === 'image' || !!block.imageUrl;
               const isTable = block.type === 'table';
               const isQuestion = block.type === 'question' || block.type === 'heading';
               const isAnswer = block.type === 'answer';
@@ -282,8 +468,8 @@ export const DocumentStep: React.FC<Props> = ({
                   style={{
                     padding: '0.85rem',
                     borderRadius: 'var(--radius-md)',
-                    border: isTable ? '1px solid rgba(56, 189, 248, 0.35)' : '1px solid var(--border-subtle)',
-                    background: isTable ? 'rgba(14, 165, 233, 0.08)' : isQuestion ? 'rgba(0, 0, 0, 0.4)' : isAnswer ? 'rgba(30, 58, 138, 0.15)' : 'var(--bg-input)',
+                    border: isImage ? '1px solid rgba(168, 85, 247, 0.4)' : isTable ? '1px solid rgba(56, 189, 248, 0.35)' : '1px solid var(--border-subtle)',
+                    background: isImage ? 'rgba(168, 85, 247, 0.08)' : isTable ? 'rgba(14, 165, 233, 0.08)' : isQuestion ? 'rgba(0, 0, 0, 0.4)' : isAnswer ? 'rgba(30, 58, 138, 0.15)' : 'var(--bg-input)',
                     display: 'flex',
                     flexDirection: 'column',
                     gap: '0.5rem'
@@ -294,9 +480,9 @@ export const DocumentStep: React.FC<Props> = ({
                       <button
                         type="button"
                         onClick={() => handleToggleBlockType(block.id)}
-                        className={`pill-badge ${isTable ? 'pill-badge-blue' : isQuestion ? 'pill-badge-blue' : isAnswer ? 'pill-badge-blue' : 'pill-badge-amber'}`}
+                        className={`pill-badge ${isImage ? 'pill-badge-blue' : isTable ? 'pill-badge-blue' : isQuestion ? 'pill-badge-blue' : isAnswer ? 'pill-badge-blue' : 'pill-badge-amber'}`}
                         style={{
-                          background: isTable ? '#0284c7' : isQuestion ? '#ffffff' : isAnswer ? '#2563eb' : 'rgba(255, 255, 255, 0.1)',
+                          background: isImage ? '#9333ea' : isTable ? '#0284c7' : isQuestion ? '#ffffff' : isAnswer ? '#2563eb' : 'rgba(255, 255, 255, 0.1)',
                           color: isQuestion ? '#000000' : '#ffffff',
                           cursor: 'pointer',
                           display: 'inline-flex',
@@ -305,6 +491,7 @@ export const DocumentStep: React.FC<Props> = ({
                         }}
                         title="Click to toggle type"
                       >
+                        {isImage && <ImageIcon size={12} />}
                         {isTable && <Table size={12} />}
                         {block.type}
                       </button>
@@ -446,7 +633,83 @@ export const DocumentStep: React.FC<Props> = ({
                       )}
                     </div>
                   ) : (
-                    block.type === 'table' && block.tableData ? (
+                    (block.type === 'image' || block.imageUrl) ? (
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', flexWrap: 'wrap' }}>
+                          {block.imageUrl && (
+                            <div style={{ position: 'relative' }}>
+                              <img
+                                src={block.imageUrl}
+                                alt={block.caption || 'Diagram'}
+                                style={{
+                                  maxWidth: '220px',
+                                  maxHeight: '120px',
+                                  borderRadius: 'var(--radius-sm)',
+                                  border: '1px solid var(--border-medium)',
+                                  objectFit: 'contain',
+                                  background: 'repeating-conic-gradient(#334155 0% 25%, #1e293b 0% 50%) 50% / 16px 16px',
+                                  padding: '4px'
+                                }}
+                              />
+                            </div>
+                          )}
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem', flex: 1, minWidth: '220px' }}>
+                            <div style={{ fontSize: '0.875rem', fontWeight: 700, color: '#ffffff' }}>
+                              {block.caption || block.text || 'Flowchart / Diagram'}
+                            </div>
+                            <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+                              Ruled Page Footprint: {block.imageWidthMm || 120}mm wide &times; {block.imageHeightMm || 60}mm high
+                            </div>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap', marginTop: '0.2rem' }}>
+                              <button
+                                type="button"
+                                className="button button-secondary"
+                                style={{
+                                  fontSize: '0.6875rem',
+                                  padding: '0.25rem 0.65rem',
+                                  display: 'inline-flex',
+                                  alignItems: 'center',
+                                  gap: '0.35rem',
+                                  borderRadius: 'var(--radius-sm)',
+                                  background: block.isTransparentBg ? 'rgba(34, 197, 94, 0.15)' : 'rgba(168, 85, 247, 0.15)',
+                                  borderColor: block.isTransparentBg ? 'rgba(34, 197, 94, 0.4)' : 'rgba(168, 85, 247, 0.4)',
+                                  color: block.isTransparentBg ? '#4ade80' : '#c084fc',
+                                  fontWeight: 600
+                                }}
+                                onClick={() => handleToggleBackgroundTransparency(block.id)}
+                                title={block.isTransparentBg ? 'Click to restore original opaque image' : 'Remove white/light background and keep text only'}
+                              >
+                                <Wand2 size={12} />
+                                {block.isTransparentBg ? 'Background Transparent (Only Text Kept)' : 'Make Background Transparent'}
+                              </button>
+
+                              {block.originalImageUrl && block.isTransparentBg && (
+                                <button
+                                  type="button"
+                                  className="button button-ghost"
+                                  style={{
+                                    fontSize: '0.6875rem',
+                                    padding: '0.25rem 0.5rem',
+                                    display: 'inline-flex',
+                                    alignItems: 'center',
+                                    gap: '0.25rem',
+                                    color: 'var(--text-muted)'
+                                  }}
+                                  onClick={() => handleToggleBackgroundTransparency(block.id)}
+                                  title="Revert back to original uploaded image"
+                                >
+                                  <Undo2 size={11} /> Restore Original
+                                </button>
+                              )}
+
+                              <span className="pill-badge pill-badge-blue" style={{ fontSize: '0.6875rem' }}>
+                                <Sparkles size={11} /> Sits directly on ruled notebook lines
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    ) : block.type === 'table' && block.tableData ? (
                       <div>
                         {block.marginPrefix && (
                           <span style={{ color: '#60a5fa', fontWeight: 700, marginRight: '0.45rem', fontFamily: 'JetBrains Mono', fontSize: '0.8125rem' }}>
@@ -499,6 +762,14 @@ export const DocumentStep: React.FC<Props> = ({
 
         </div>
       )}
+
+      {/* Sticky Mobile Proceed Button */}
+      <div className="mobile-bottom-action-bar show-on-mobile">
+        <button onClick={onNext} className="btn btn-primary btn-lg" style={{ width: '100%', justifyContent: 'center' }}>
+          <span>Proceed to Studio Preview ({blocks.length})</span>
+          <ArrowRight size={18} />
+        </button>
+      </div>
 
     </div>
   );

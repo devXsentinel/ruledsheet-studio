@@ -1,0 +1,80 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 680 720" width="680" height="720" style="background: transparent; font-family: 'Bad Script', 'Caveat', 'Patrick Hand', cursive, sans-serif;">
+  <defs>
+    <marker id="flow-arrow" viewBox="0 0 10 10" refX="6" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+      <path d="M 0 1.5 L 8 5 L 0 8.5 z" fill="#000000" />
+    </marker>
+    <filter id="ink-softness" x="-10%" y="-10%" width="120%" height="120%">
+      <feGaussianBlur stdDeviation="0.2" result="blur" />
+      <feMerge>
+        <feMergeNode in="blur" />
+        <feMergeNode in="SourceGraphic" />
+      </feMerge>
+    </filter>
+  </defs>
+  <!-- 1. Start -->
+  <rect x="260" y="20" width="160" height="38" rx="19" fill="none" stroke="#000000" stroke-width="2" />
+  <text x="340" y="44" font-size="16" font-weight="600" fill="#000000" text-anchor="middle">Start</text>
+
+  <line x1="340" y1="58" x2="340" y2="92" stroke="#000000" stroke-width="2" marker-end="url(#flow-arrow)" />
+
+  <!-- 2. Push Start Node to Open List -->
+  <rect x="210" y="94" width="260" height="44" rx="4" fill="none" stroke="#000000" stroke-width="2" />
+  <text x="340" y="115" font-size="14" font-weight="600" fill="#000000" text-anchor="middle">Push Start Node to Open List</text>
+  <text x="340" y="131" font-size="12" fill="#000000" text-anchor="middle">g = 0, f = h(Start)</text>
+
+  <line x1="340" y1="138" x2="340" y2="180" stroke="#000000" stroke-width="2" marker-end="url(#flow-arrow)" />
+
+  <!-- 3. Decision: Is Open List Empty? -->
+  <polygon points="340,182 445,222 340,262 235,222" fill="none" stroke="#000000" stroke-width="2" />
+  <text x="340" y="227" font-size="14" font-weight="600" fill="#000000" text-anchor="middle">Is Open List Empty?</text>
+
+  <!-- Empty YES -> Return No Path -->
+  <line x1="235" y1="222" x2="130" y2="222" stroke="#000000" stroke-width="2" />
+  <line x1="130" y1="222" x2="130" y2="285" stroke="#000000" stroke-width="2" marker-end="url(#flow-arrow)" />
+  <text x="175" y="214" font-size="14" font-weight="700" fill="#000000">Yes</text>
+
+  <rect x="50" y="288" width="160" height="42" rx="4" fill="none" stroke="#000000" stroke-width="2" />
+  <text x="130" y="314" font-size="14" font-weight="600" fill="#000000" text-anchor="middle">Return: No Path Exists</text>
+
+  <!-- Empty NO -> Pop Node n with Min f(n) -->
+  <line x1="445" y1="222" x2="520" y2="222" stroke="#000000" stroke-width="2" />
+  <line x1="520" y1="222" x2="520" y2="285" stroke="#000000" stroke-width="2" marker-end="url(#flow-arrow)" />
+  <text x="475" y="214" font-size="14" font-weight="700" fill="#000000">No</text>
+
+  <rect x="425" y="288" width="190" height="42" rx="4" fill="none" stroke="#000000" stroke-width="2" />
+  <text x="520" y="314" font-size="14" fill="#000000" text-anchor="middle">Pop Node n with Min f(n)</text>
+
+  <line x1="520" y1="330" x2="520" y2="368" stroke="#000000" stroke-width="2" marker-end="url(#flow-arrow)" />
+
+  <!-- 4. Decision: Is n == Goal? -->
+  <polygon points="520,370 620,410 520,450 420,410" fill="none" stroke="#000000" stroke-width="2" />
+  <text x="520" y="415" font-size="15" font-weight="600" fill="#000000" text-anchor="middle">Is n == Goal?</text>
+
+  <!-- Goal YES -> Reconstruct Path -->
+  <line x1="420" y1="410" x2="300" y2="410" stroke="#000000" stroke-width="2" marker-end="url(#flow-arrow)" />
+  <text x="355" y="402" font-size="14" font-weight="700" fill="#000000">Yes</text>
+
+  <rect x="110" y="388" width="185" height="44" rx="4" fill="none" stroke="#000000" stroke-width="2" />
+  <text x="202" y="408" font-size="13" font-weight="600" fill="#000000" text-anchor="middle">Reconstruct Optimal Path</text>
+  <text x="202" y="424" font-size="12" fill="#000000" text-anchor="middle">&amp; Return Shortest Route</text>
+
+  <!-- Goal NO -> Move n to Closed List & Expand -->
+  <line x1="520" y1="450" x2="520" y2="495" stroke="#000000" stroke-width="2" marker-end="url(#flow-arrow)" />
+  <text x="530" y="475" font-size="14" font-weight="700" fill="#000000">No</text>
+
+  <rect x="425" y="497" width="190" height="38" rx="4" fill="none" stroke="#000000" stroke-width="2" />
+  <text x="520" y="521" font-size="14" fill="#000000" text-anchor="middle">Move n to Closed List</text>
+
+  <line x1="520" y1="535" x2="520" y2="575" stroke="#000000" stroke-width="2" marker-end="url(#flow-arrow)" />
+
+  <!-- 5. For each neighbor m of n -->
+  <rect x="375" y="577" width="290" height="52" rx="4" fill="none" stroke="#000000" stroke-width="2" />
+  <text x="520" y="598" font-size="13" font-weight="600" fill="#000000" text-anchor="middle">For each neighbor m of Node n:</text>
+  <text x="520" y="618" font-size="12" fill="#000000" text-anchor="middle">Compute g(m) &amp; f(m) = g(m) + h(m)</text>
+
+  <line x1="520" y1="629" x2="520" y2="665" stroke="#000000" stroke-width="2" marker-end="url(#flow-arrow)" />
+
+  <!-- 6. Update Parent & Push to Open List -->
+  <rect x="375" y="667" width="290" height="42" rx="4" fill="none" stroke="#000000" stroke-width="2" />
+  <text x="520" y="693" font-size="12.5" fill="#000000" text-anchor="middle">Update Parent &amp; Push to Open List</text>
+</svg>

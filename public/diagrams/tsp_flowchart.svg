@@ -1,0 +1,96 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 680 720" width="680" height="720" style="background: transparent; font-family: 'Bad Script', 'Caveat', 'Patrick Hand', cursive, sans-serif;">
+  <defs>
+    <marker id="flow-arrow" viewBox="0 0 10 10" refX="6" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+      <path d="M 0 1.5 L 8 5 L 0 8.5 z" fill="#000000" />
+    </marker>
+    <filter id="ink-softness" x="-10%" y="-10%" width="120%" height="120%">
+      <feGaussianBlur stdDeviation="0.2" result="blur" />
+      <feMerge>
+        <feMergeNode in="blur" />
+        <feMergeNode in="SourceGraphic" />
+      </feMerge>
+    </filter>
+  </defs>
+  <!-- 1. Start -->
+  <rect x="260" y="20" width="160" height="38" rx="19" fill="none" stroke="#000000" stroke-width="2" />
+  <text x="340" y="44" font-size="16" font-weight="600" fill="#000000" text-anchor="middle">Start</text>
+
+  <line x1="340" y1="58" x2="340" y2="92" stroke="#000000" stroke-width="2" marker-end="url(#flow-arrow)" />
+
+  <!-- 2. Reduce Initial Cost Matrix -->
+  <rect x="210" y="94" width="260" height="45" rx="4" fill="none" stroke="#000000" stroke-width="2" />
+  <text x="340" y="115" font-size="14" font-weight="600" fill="#000000" text-anchor="middle">Reduce Initial Cost Matrix</text>
+  <text x="340" y="131" font-size="12" fill="#000000" text-anchor="middle">&amp; Compute Root Lower Bound</text>
+
+  <line x1="340" y1="139" x2="340" y2="175" stroke="#000000" stroke-width="2" marker-end="url(#flow-arrow)" />
+
+  <!-- 3. Push Root Node to Priority Queue -->
+  <rect x="220" y="177" width="240" height="42" rx="4" fill="none" stroke="#000000" stroke-width="2" />
+  <text x="340" y="203" font-size="14" fill="#000000" text-anchor="middle">Push Root Node to Priority Queue</text>
+
+  <line x1="340" y1="219" x2="340" y2="258" stroke="#000000" stroke-width="2" marker-end="url(#flow-arrow)" />
+
+  <!-- 4. Decision: Is Priority Queue Empty? -->
+  <polygon points="340,260 445,300 340,340 235,300" fill="none" stroke="#000000" stroke-width="2" />
+  <text x="340" y="305" font-size="14" font-weight="600" fill="#000000" text-anchor="middle">Is Queue Empty?</text>
+
+  <!-- Branch YES -> Return Best Tour -->
+  <line x1="235" y1="300" x2="130" y2="300" stroke="#000000" stroke-width="2" />
+  <line x1="130" y1="300" x2="130" y2="365" stroke="#000000" stroke-width="2" marker-end="url(#flow-arrow)" />
+  <text x="175" y="292" font-size="14" font-weight="700" fill="#000000">Yes</text>
+
+  <rect x="50" y="368" width="160" height="42" rx="4" fill="none" stroke="#000000" stroke-width="2" />
+  <text x="130" y="394" font-size="14" font-weight="600" fill="#000000" text-anchor="middle">Return Best Tour</text>
+
+  <!-- Branch NO -> Pop Node with Min Bound -->
+  <line x1="445" y1="300" x2="520" y2="300" stroke="#000000" stroke-width="2" />
+  <line x1="520" y1="300" x2="520" y2="365" stroke="#000000" stroke-width="2" marker-end="url(#flow-arrow)" />
+  <text x="475" y="292" font-size="14" font-weight="700" fill="#000000">No</text>
+
+  <rect x="425" y="368" width="190" height="42" rx="4" fill="none" stroke="#000000" stroke-width="2" />
+  <text x="520" y="394" font-size="14" fill="#000000" text-anchor="middle">Pop Node with Min Bound</text>
+
+  <line x1="520" y1="410" x2="520" y2="445" stroke="#000000" stroke-width="2" marker-end="url(#flow-arrow)" />
+
+  <!-- 5. Decision: Is Bound >= Upper? -->
+  <polygon points="520,447 625,485 520,523 415,485" fill="none" stroke="#000000" stroke-width="2" />
+  <text x="520" y="490" font-size="14" font-weight="600" fill="#000000" text-anchor="middle">Is Bound ≥ Upper?</text>
+
+  <!-- Prune YES -->
+  <line x1="415" y1="485" x2="330" y2="485" stroke="#000000" stroke-width="2" marker-end="url(#flow-arrow)" />
+  <text x="370" y="476" font-size="14" font-weight="700" fill="#000000">Yes</text>
+
+  <rect x="210" y="465" width="115" height="38" rx="4" fill="none" stroke="#000000" stroke-width="2" />
+  <text x="267" y="489" font-size="13" font-weight="600" fill="#000000" text-anchor="middle">Prune Node</text>
+
+  <!-- Loop from Prune back to Queue Check -->
+  <line x1="210" y1="485" x2="30" y2="485" stroke="#000000" stroke-width="1.8" />
+  <line x1="30" y1="485" x2="30" y2="240" stroke="#000000" stroke-width="1.8" />
+  <line x1="30" y1="240" x2="340" y2="240" stroke="#000000" stroke-width="1.8" marker-end="url(#flow-arrow)" />
+
+  <!-- Bound < Upper (NO) -> Visited All Cities? -->
+  <line x1="520" y1="523" x2="520" y2="560" stroke="#000000" stroke-width="2" marker-end="url(#flow-arrow)" />
+  <text x="530" y="545" font-size="14" font-weight="700" fill="#000000">No</text>
+
+  <!-- 6. Decision: Visited All Cities? -->
+  <polygon points="520,562 625,600 520,638 415,600" fill="none" stroke="#000000" stroke-width="2" />
+  <text x="520" y="605" font-size="14" font-weight="600" fill="#000000" text-anchor="middle">Visited All Cities?</text>
+
+  <!-- Visited YES -> Update Min Tour -->
+  <line x1="415" y1="600" x2="310" y2="600" stroke="#000000" stroke-width="2" marker-end="url(#flow-arrow)" />
+  <text x="360" y="590" font-size="14" font-weight="700" fill="#000000">Yes</text>
+
+  <rect x="140" y="578" width="165" height="44" rx="4" fill="none" stroke="#000000" stroke-width="2" />
+  <text x="222" y="598" font-size="13" font-weight="600" fill="#000000" text-anchor="middle">Update Min Tour</text>
+  <text x="222" y="614" font-size="12" fill="#000000" text-anchor="middle">&amp; Set Upper Bound</text>
+
+  <!-- Visited NO -> Generate Children & Push -->
+  <line x1="625" y1="600" x2="655" y2="600" stroke="#000000" stroke-width="2" />
+  <line x1="655" y1="600" x2="655" y2="675" stroke="#000000" stroke-width="2" />
+  <line x1="655" y1="675" x2="520" y2="675" stroke="#000000" stroke-width="2" marker-end="url(#flow-arrow)" />
+  <text x="635" y="588" font-size="14" font-weight="700" fill="#000000">No</text>
+
+  <rect x="420" y="655" width="200" height="44" rx="4" fill="none" stroke="#000000" stroke-width="2" />
+  <text x="520" y="675" font-size="13" font-weight="600" fill="#000000" text-anchor="middle">Generate Child Nodes</text>
+  <text x="520" y="691" font-size="12" fill="#000000" text-anchor="middle">Reduce Bounds &amp; Push to PQ</text>
+</svg>

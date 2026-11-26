@@ -45,5 +45,7 @@ Thumbs.db
 *.mjs
 *.pdf
 scratch/
+scratch_*
+.playwright-mcp/
 __pycache__/
 *_backup.*

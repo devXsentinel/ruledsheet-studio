@@ -7,9 +7,17 @@ import {
   LayoutResult,
   LayoutTable,
   LayoutTableCell,
-  LayoutTableGridLine
+  LayoutTableGridLine,
+  LayoutImage
 } from '../types';
 import { extractMarginPrefix } from './docxParser';
+import {
+  parseMatrixLines,
+  generateMatrixSvg,
+  getPrebuiltFlowchartInfo,
+  generateAsciiDiagramSvg,
+  applySvgOptions
+} from './flowchartGenerator';
 
 // Standard conversion factor: 1 mm = 72 / 25.4 points
 export const MM_TO_PT = 72 / 25.4; // ~2.83464567
@@ -124,6 +132,7 @@ export function computeLayout(
   let currentLineIndex = 0;
   let pageLines: LayoutLine[] = [];
   let pageTables: LayoutTable[] = [];
+  let pageImages: LayoutImage[] = [];
   let totalLinesCount = 0;
   let globalLineSeed = 42;
 
@@ -132,7 +141,8 @@ export function computeLayout(
       pages.push({
         pageIndex: pages.length,
         lines: [],
-        tables: []
+        tables: [],
+        images: []
       });
     }
   }
@@ -147,17 +157,40 @@ export function computeLayout(
       pages[currentPageIndex].tables = [...pageTables];
       pageTables = [];
     }
+    if (pageImages.length > 0) {
+      pages[currentPageIndex].images = [...pageImages];
+      pageImages = [];
+    }
     currentPageIndex++;
     currentLineIndex = 0;
   }
 
   for (let bIndex = 0; bIndex < blocks.length; bIndex++) {
     const block = blocks[bIndex];
-    if ((!block.text || block.text.trim().length === 0) && !block.marginPrefix && !block.tableData) continue;
+    if ((!block.text || block.text.trim().length === 0) && !block.marginPrefix && !block.tableData && !block.imageUrl) continue;
 
     // 1. Force Page Break: if block has pageBreakBefore and we are not already at the clean top of a blank page
     if (block.pageBreakBefore && (currentLineIndex > 0 || (currentPageIndex === 0 && (pageLines.length > 0 || pageTables.length > 0)))) {
       advanceToNextPage();
+    }
+
+    // 1b. Diagram / Matrix Intro Orphan Prevention:
+    // If this block introduces an image or matrix (or is a heading/label immediately preceding it),
+    // and both together cannot fit on the current page, start them together cleanly on the next page.
+    if (bIndex + 1 < blocks.length && currentLineIndex > 0) {
+      const nextBlock = blocks[bIndex + 1];
+      if (nextBlock.type === 'image') {
+        const isIntroText =
+          block.type === 'heading' ||
+          (block.text && (block.text.trim().endsWith(':') || block.text.toLowerCase().includes('matrix') || block.text.toLowerCase().includes('flowchart')));
+        if (isIntroText) {
+          const isNextMatrix = nextBlock.diagramType === 'matrix' || (nextBlock.text && nextBlock.text.includes('Matrix'));
+          const nextLinesNeeded = isNextMatrix ? 5 : 12;
+          if (currentLineIndex + nextLinesNeeded + 2 >= linesMm.length) {
+            advanceToNextPage();
+          }
+        }
+      }
     }
 
     // 2. Ruled Line Spacing before block
@@ -385,6 +418,239 @@ export function computeLayout(
       continue; // Done with table block
     }
 
+    // 3b. IMAGE / DIAGRAM / MATRIX BLOCK LAYOUT ON RULED LINES
+    if (block.type === 'image' && (block.imageUrl || block.diagramType || block.rawDiagramLines)) {
+      const isMatrixCandidate =
+        block.diagramType === 'matrix' ||
+        (block.caption && block.caption.toLowerCase().includes('matrix')) ||
+        (block.text && (block.text.toLowerCase().includes('matrix') || block.text.includes('['))) ||
+        (block.rawDiagramLines && block.rawDiagramLines.some(l => l.includes('[')));
+
+      if (!isMatrixCandidate && currentLineIndex > 0 && currentLineIndex < linesMm.length - 2) {
+        currentLineIndex += 1;
+      }
+
+      const writingInkColor = settings.smartQaColors
+        ? settings.answerColor
+        : (settings.normalColor || '#1e3a8a');
+      const writingFontFamily = settings.fontFamily;
+
+      let activeImageUrl = block.imageUrl || '';
+      let activeSvgContent: string | undefined = block.svgContent;
+      let activeWidthMm = block.imageWidthMm || 140;
+      let activeHeightMm = block.imageHeightMm || 60;
+      let activeCaption = block.caption;
+
+      // 1. Matrix Block: dynamically re-rendered in the chosen handwriting font and ink style
+      const matrixRaw = block.rawDiagramLines || (block.text ? block.text.split('\n') : []);
+      const matrixData = (block.diagramType === 'matrix' || matrixRaw.length >= 2) ? parseMatrixLines(matrixRaw) : null;
+      if (matrixData) {
+        const matrixInfo = generateMatrixSvg(matrixData, {
+          fontFamily: writingFontFamily,
+          inkColor: writingInkColor,
+          fontSizePt: settings.fontSizePt > 13 ? settings.fontSizePt : 15
+        });
+        activeImageUrl = matrixInfo.svgDataUrl;
+        activeSvgContent = matrixInfo.svg;
+        activeWidthMm = matrixInfo.widthMm;
+        activeHeightMm = matrixInfo.heightMm;
+        activeCaption = ''; // Matrices do not have captions underneath
+      }
+      // 2. Prebuilt dedicated flowchart: dynamically re-rendered in chosen font and pure black ink style
+      else if (block.diagramType && block.diagramType !== 'ascii') {
+        const info = getPrebuiltFlowchartInfo(block.diagramType, {
+          fontFamily: writingFontFamily,
+          inkColor: '#000000'
+        });
+        if (info) {
+          activeImageUrl = info.svgDataUrl;
+          activeSvgContent = info.svg;
+          activeWidthMm = info.widthMm;
+          activeHeightMm = info.heightMm;
+          activeCaption = block.caption || info.caption;
+        }
+      }
+      // 3. Raw diagram lines: check for prebuilt or generate dynamic ASCII diagram
+      else if (block.rawDiagramLines && block.rawDiagramLines.length > 0) {
+        const combinedText = block.rawDiagramLines.join('\n');
+        const prebuilt = getPrebuiltFlowchartInfo(combinedText, {
+          fontFamily: writingFontFamily,
+          inkColor: '#000000'
+        });
+        if (prebuilt) {
+          activeImageUrl = prebuilt.svgDataUrl;
+          activeSvgContent = prebuilt.svg;
+          activeWidthMm = prebuilt.widthMm;
+          activeHeightMm = prebuilt.heightMm;
+          activeCaption = block.caption || prebuilt.caption;
+        } else {
+          const asciiInfo = generateAsciiDiagramSvg(block.rawDiagramLines, {
+            fontFamily: writingFontFamily,
+            inkColor: '#000000',
+            caption: block.caption
+          });
+          activeImageUrl = asciiInfo.svgDataUrl;
+          activeSvgContent = asciiInfo.svg;
+          activeWidthMm = asciiInfo.widthMm;
+          activeHeightMm = asciiInfo.heightMm;
+        }
+      }
+      // 4. Fallback check by caption or text
+      else if (block.caption || block.text) {
+        const info = getPrebuiltFlowchartInfo(block.caption || block.text, {
+          fontFamily: writingFontFamily,
+          inkColor: '#000000'
+        });
+        if (info) {
+          activeImageUrl = info.svgDataUrl;
+          activeSvgContent = info.svg;
+          activeWidthMm = info.widthMm;
+          activeHeightMm = info.heightMm;
+          activeCaption = block.caption || info.caption;
+        }
+      }
+
+      // 5. Ultimate Fallback: Decode SVG data URL to extract matrices, prebuilts, or apply chosen font & ink
+      if (!activeSvgContent && activeImageUrl.startsWith('data:image/svg+xml')) {
+        try {
+          const commaIdx = activeImageUrl.indexOf(',');
+          const decodedSvg = decodeURIComponent(activeImageUrl.slice(commaIdx + 1));
+
+          // Extract text lines from SVG text elements
+          const textMatches = Array.from(decodedSvg.matchAll(/<text[^>]*>([\s\S]*?)<\/text>/gi));
+          const extractedLines = textMatches
+            .map(m => m[1].replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"').trim())
+            .filter(Boolean);
+
+          // A. Matrix Detection from SVG content
+          const isMatrixCandidate =
+            (block.diagramType === 'matrix') ||
+            (block.caption && block.caption.toLowerCase().includes('matrix')) ||
+            (block.text && block.text.toLowerCase().includes('matrix')) ||
+            extractedLines.some(l => l.includes('[') && l.includes(']'));
+
+          if (isMatrixCandidate) {
+            const matrixParsed = parseMatrixLines(extractedLines) || (block.text ? parseMatrixLines(block.text.split('\n')) : null);
+            if (matrixParsed) {
+              const matrixInfo = generateMatrixSvg(matrixParsed, {
+                fontFamily: writingFontFamily,
+                inkColor: writingInkColor,
+                fontSizePt: settings.fontSizePt > 13 ? settings.fontSizePt : 15
+              });
+              activeImageUrl = matrixInfo.svgDataUrl;
+              activeSvgContent = matrixInfo.svg;
+              activeWidthMm = matrixInfo.widthMm;
+              activeHeightMm = matrixInfo.heightMm;
+              activeCaption = '';
+            }
+          }
+
+          // B. Prebuilt Flowchart matching from decoded SVG text
+          if (!activeSvgContent) {
+            const combinedContent = `${block.caption || ''} ${block.text || ''} ${extractedLines.join(' ')}`;
+            const prebuilt = getPrebuiltFlowchartInfo(combinedContent, {
+              fontFamily: writingFontFamily,
+              inkColor: writingInkColor
+            });
+            if (prebuilt) {
+              activeImageUrl = prebuilt.svgDataUrl;
+              activeSvgContent = prebuilt.svg;
+              activeWidthMm = prebuilt.widthMm;
+              activeHeightMm = prebuilt.heightMm;
+              activeCaption = block.caption || prebuilt.caption;
+            }
+          }
+
+          // C. Dynamic SVG styling fallback
+          if (!activeSvgContent) {
+            const updatedSvg = applySvgOptions(decodedSvg, {
+              fontFamily: writingFontFamily,
+              inkColor: writingInkColor
+            });
+            activeSvgContent = updatedSvg;
+            activeImageUrl = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(updatedSvg);
+          }
+        } catch (svgErr) {
+          console.warn('LayoutEngine SVG decode error:', svgErr);
+        }
+      }
+
+      const blockIndentMm = block.indentMm || 0;
+      const leftLimitMm = template.writingArea.leftMarginMm + blockIndentMm;
+      const maxAvailableWidthMm = Math.max(30, effectiveRightMarginMm - leftLimitMm);
+
+      const widthMm = Math.min(activeWidthMm, maxAvailableWidthMm);
+      const heightMm = activeHeightMm;
+
+      const defaultPitchMm = linesMm.length > 1
+        ? (linesMm[linesMm.length - 1] - linesMm[0]) / (linesMm.length - 1)
+        : 7.3;
+
+      const maxPageHeightMm = linesMm.length > 1
+        ? (linesMm[linesMm.length - 1] - linesMm[0])
+        : 220;
+      const clampedHeightMm = Math.min(heightMm, maxPageHeightMm);
+      const isMatrix =
+        block.diagramType === 'matrix' ||
+        (matrixData !== null) ||
+        isMatrixCandidate ||
+        (activeCaption && activeCaption.toLowerCase().includes('matrix')) ||
+        (activeSvgContent && activeSvgContent.includes('>[<'));
+
+      if (isMatrix) {
+        activeCaption = '';
+      }
+
+      const matrixRowCount = matrixData?.rows?.length || (matrixRaw.length >= 2 ? matrixRaw.length : 0);
+      const linesNeeded = isMatrix
+        ? Math.max(2, matrixRowCount > 0 ? (matrixRowCount + (matrixData?.footer ? 1 : 0)) : Math.round(clampedHeightMm / defaultPitchMm))
+        : Math.min(linesMm.length - 1, Math.ceil(clampedHeightMm / defaultPitchMm) + 1);
+
+      // Advance to next fresh page if diagram won't fit on remaining lines of this page
+      if (currentLineIndex > 0 && currentLineIndex + linesNeeded >= linesMm.length) {
+        advanceToNextPage();
+      }
+
+      const baselineOffset = settings.baselineOffsetMm ?? -0.5;
+      const imageTopYMm = isMatrix
+        ? linesMm[currentLineIndex] + baselineOffset - (defaultPitchMm * 0.78)
+        : linesMm[currentLineIndex];
+      const centeredX = leftLimitMm + Math.max(0, (maxAvailableWidthMm - widthMm) / 2);
+      const finalHeightMm = isMatrix ? linesNeeded * defaultPitchMm : clampedHeightMm;
+
+      pageImages.push({
+        id: `img_${block.id}_p${currentPageIndex}`,
+        blockId: block.id,
+        pageIndex: currentPageIndex,
+        xMm: Math.round(centeredX * 100) / 100,
+        yMm: Math.round(imageTopYMm * 100) / 100,
+        widthMm: Math.round(widthMm * 100) / 100,
+        heightMm: Math.round(finalHeightMm * 100) / 100,
+        imageUrl: activeImageUrl,
+        svgContent: activeSvgContent,
+        caption: isMatrix ? '' : activeCaption,
+        isMatrix: !!isMatrix
+      });
+
+      currentLineIndex += linesNeeded;
+      totalLinesCount += linesNeeded;
+
+      // Ruled line gap after diagram (matrices fit compactly on lines without arbitrary empty gap)
+      if (!isMatrix) {
+        if (currentLineIndex < linesMm.length) {
+          currentLineIndex += 1;
+        } else {
+          advanceToNextPage();
+        }
+      } else {
+        if (currentLineIndex >= linesMm.length) {
+          advanceToNextPage();
+        }
+      }
+
+      continue;
+    }
+
     // 4. Orphan prevention: if block is heading or question with <= 1 line left before page ends,
     // move to top of next page so it isn't stranded alone at the bottom
     if (
@@ -502,18 +768,21 @@ export function computeLayout(
     }
   }
 
-  // Push remaining lines and tables on the last page
-  if (pageLines.length > 0 || pageTables.length > 0) {
+  // Push remaining lines, tables, and images on the last page
+  if (pageLines.length > 0 || pageTables.length > 0 || pageImages.length > 0) {
     ensurePage();
     pages[currentPageIndex].lines = [...pageLines];
     if (pageTables.length > 0) {
       pages[currentPageIndex].tables = [...pageTables];
     }
+    if (pageImages.length > 0) {
+      pages[currentPageIndex].images = [...pageImages];
+    }
   }
 
   // Ensure at least 1 page exists
   if (pages.length === 0) {
-    pages.push({ pageIndex: 0, lines: [], tables: [] });
+    pages.push({ pageIndex: 0, lines: [], tables: [], images: [] });
   }
 
   return {

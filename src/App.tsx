@@ -14,7 +14,7 @@ import {
 import { parsePlainText, SAMPLE_ASSIGNMENT_TEXT } from './utils/docxParser';
 import { computeLayout } from './utils/layoutEngine';
 
-import { StepIndicator, StepId } from './components/StepIndicator';
+import { StepIndicator, MobileBottomNav, StepId } from './components/StepIndicator';
 import { TemplateStep } from './components/TemplateStep';
 import { DocumentStep } from './components/DocumentStep';
 import { PreviewStep } from './components/PreviewStep';
@@ -194,6 +194,14 @@ export const App: React.FC = () => {
           onBackToPreview={() => setCurrentStep('preview')}
         />
       )}
+
+      {/* Mobile Bottom Navigation Bar */}
+      <MobileBottomNav
+        currentStep={currentStep}
+        onSelectStep={setCurrentStep}
+        hasTemplate={true}
+        hasDocument={blocks.length > 0}
+      />
 
       {/* Line Calibration Modal */}
       {isCalibrationOpen && (

@@ -50,3 +50,43 @@ export const StepIndicator: React.FC<Props> = ({
     </nav>
   );
 };
+
+export const MobileBottomNav: React.FC<Props> = ({
+  currentStep,
+  onSelectStep,
+  hasTemplate,
+  hasDocument
+}) => {
+  const steps: { id: StepId; label: string; shortLabel: string; icon: React.ElementType; isDone: boolean }[] = [
+    { id: 'template', label: 'Template', shortLabel: 'Paper', icon: Sliders, isDone: hasTemplate },
+    { id: 'document', label: 'Document', shortLabel: 'Doc', icon: FileText, isDone: hasDocument },
+    { id: 'preview', label: 'Studio Preview', shortLabel: 'Studio', icon: Eye, isDone: hasDocument },
+    { id: 'export', label: 'Export PDFs', shortLabel: 'Export', icon: Download, isDone: hasDocument }
+  ];
+
+  return (
+    <nav className="mobile-bottom-nav show-on-mobile" aria-label="Mobile Navigation">
+      {steps.map((s) => {
+        const isActive = currentStep === s.id;
+        const isAccessible = s.id === 'template' || s.id === 'document' || hasDocument;
+
+        return (
+          <button
+            key={s.id}
+            onClick={() => isAccessible && onSelectStep(s.id)}
+            disabled={!isAccessible}
+            className={`mobile-nav-item ${isActive ? 'active' : ''}`}
+            aria-label={s.label}
+            aria-current={isActive ? 'step' : undefined}
+          >
+            <div className="mobile-nav-icon-wrap">
+              <s.icon size={20} />
+              {s.isDone && !isActive && <span className="mobile-nav-dot" />}
+            </div>
+            <span className="mobile-nav-label">{s.shortLabel}</span>
+          </button>
+        );
+      })}
+    </nav>
+  );
+};

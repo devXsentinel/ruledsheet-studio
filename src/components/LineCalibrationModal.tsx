@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { TemplateConfig } from '../types';
 import { detectRuledLinesFromImage } from '../utils/lineDetector';
 import { DEFAULT_RULED_LINES_MM, DEFAULT_TEMPLATE } from '../utils/defaultTemplate';
@@ -44,6 +44,14 @@ export const LineCalibrationModal: React.FC<Props> = ({ template, onSave, onClos
   const [mobileTab, setMobileTab] = useState<'canvas' | 'controls'>('canvas');
 
   const containerRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (window.innerWidth < 768) {
+      const available = Math.max(260, window.innerWidth - 32);
+      const fitZoom = Math.min(0.85, Math.max(0.35, Math.round((available / 600) * 100) / 100));
+      setZoom(fitZoom);
+    }
+  }, []);
 
   // Auto-detect lines using canvas pixel processing
   const handleAutoDetect = async () => {
@@ -219,7 +227,7 @@ export const LineCalibrationModal: React.FC<Props> = ({ template, onSave, onClos
               </button>
             </div>
 
-            <div style={{ position: 'absolute', top: '1rem', right: '1rem', zIndex: 20, background: 'rgba(15, 23, 42, 0.85)', padding: '0.35rem 0.75rem', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-medium)', fontSize: '0.6875rem', color: 'var(--text-secondary)', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+            <div className="hide-on-mobile" style={{ position: 'absolute', top: '1rem', right: '1rem', zIndex: 20, background: 'rgba(15, 23, 42, 0.85)', padding: '0.35rem 0.75rem', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-medium)', fontSize: '0.6875rem', color: 'var(--text-secondary)', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
               <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#ef4444' }}></span>
               Click sheet to add line &bull; Click line to adjust
             </div>

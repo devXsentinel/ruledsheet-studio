@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 191 168" width="191" height="168" style="background: transparent;">
+  <style>
+    text {
+      font-family: 'Consolas', 'Courier New', 'SF Mono', monospace;
+      font-size: 13px;
+      font-weight: 500;
+      fill: #000000;
+      letter-spacing: 0px;
+    }
+  </style>
+    <text x="22" y="30.5" xml:space="preserve">+-----------------+</text>
+    <text x="22" y="47" xml:space="preserve">|      Start      |</text>
+    <text x="22" y="63.5" xml:space="preserve">+--------+--------+</text>
+    <text x="22" y="80" xml:space="preserve">         |</text>
+    <text x="22" y="96.5" xml:space="preserve">         v</text>
+    <text x="22" y="113" xml:space="preserve">+-----------------+</text>
+    <text x="22" y="129.5" xml:space="preserve">|     Row = 0     |</text>
+    <text x="22" y="146" xml:space="preserve">+--------+--------+</text>
+</svg>

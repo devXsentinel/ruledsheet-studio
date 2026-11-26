@@ -15,6 +15,7 @@ import { MM_TO_PT } from './layoutEngine';
  * Cache for loaded font ArrayBuffers to avoid re-fetching on multiple exports
  */
 const fontBufferCache = new Map<string, ArrayBuffer>();
+const fontBase64Cache = new Map<string, string>();
 
 async function getFontBytes(fontFamily: string): Promise<ArrayBuffer> {
   const fontFileMap: Record<string, string> = {
@@ -45,6 +46,22 @@ async function getFontBytes(fontFamily: string): Promise<ArrayBuffer> {
   return buf;
 }
 
+async function getFontBase64(fontFamily: string): Promise<string> {
+  if (fontBase64Cache.has(fontFamily)) {
+    return fontBase64Cache.get(fontFamily)!;
+  }
+  const buf = await getFontBytes(fontFamily);
+  let binary = '';
+  const bytes = new Uint8Array(buf);
+  const len = bytes.byteLength;
+  for (let i = 0; i < len; i++) {
+    binary += String.fromCharCode(bytes[i]);
+  }
+  const b64 = btoa(binary);
+  fontBase64Cache.set(fontFamily, b64);
+  return b64;
+}
+
 /**
  * Helper to parse hex color (#rrggbb) into pdf-lib rgb(r, g, b)
  */
@@ -57,6 +74,63 @@ function parseHexColor(hex: string) {
     return rgb(r, g, b);
   }
   return rgb(0.1, 0.1, 0.1);
+}
+
+/**
+ * Converts an SVG Data URL into high-resolution PNG bytes using an offscreen canvas
+ * so pdf-lib can embed vector flowcharts into the exported PDF.
+ * Injects the chosen TrueType handwriting font into the SVG before rasterization.
+ */
+async function svgDataUrlToPngBytes(svgDataUrl: string, fontFamily?: string): Promise<Uint8Array> {
+  let targetUrl = svgDataUrl;
+  if (fontFamily) {
+    try {
+      const b64 = await getFontBase64(fontFamily);
+      const prefix = 'data:image/svg+xml;charset=utf-8,';
+      if (svgDataUrl.startsWith(prefix)) {
+        let svgText = decodeURIComponent(svgDataUrl.slice(prefix.length));
+        const fontFaceTag = `<defs><style>
+@font-face {
+  font-family: '${fontFamily}';
+  src: url('data:font/truetype;charset=utf-8;base64,${b64}') format('truetype');
+  font-weight: normal;
+  font-style: normal;
+}
+</style></defs>`;
+        svgText = svgText.replace(/(<svg[^>]*>)/i, `$1\n${fontFaceTag}`);
+        targetUrl = prefix + encodeURIComponent(svgText);
+      }
+    } catch (err) {
+      console.warn('Could not embed font into SVG for PDF rasterization:', err);
+    }
+  }
+
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.onload = () => {
+      const canvas = document.createElement('canvas');
+      const w = img.naturalWidth || 680;
+      const h = img.naturalHeight || 750;
+      canvas.width = w * 2;
+      canvas.height = h * 2;
+      const ctx = canvas.getContext('2d');
+      if (ctx) {
+        ctx.scale(2, 2);
+        ctx.drawImage(img, 0, 0, w, h);
+        canvas.toBlob((blob) => {
+          if (blob) {
+            blob.arrayBuffer().then(buf => resolve(new Uint8Array(buf)));
+          } else {
+            reject(new Error('Canvas blob creation failed'));
+          }
+        }, 'image/png');
+      } else {
+        reject(new Error('Canvas 2D context unavailable'));
+      }
+    };
+    img.onerror = (e) => reject(e);
+    img.src = targetUrl;
+  });
 }
 
 /**
@@ -279,6 +353,74 @@ export async function generateHandwritingPdf(
               lineHeight: tbl.fontSizePt
             });
           }
+        }
+      }
+    }
+
+    // Render images / diagrams on this page
+    if (layoutPage.images && layoutPage.images.length > 0) {
+      for (const img of layoutPage.images) {
+        try {
+          let pdfImg: any = null;
+          if (img.imageUrl.startsWith('data:image/svg+xml')) {
+            try {
+              const pngBytes = await svgDataUrlToPngBytes(img.imageUrl, settings.fontFamily);
+              pdfImg = await pdfDoc.embedPng(pngBytes);
+            } catch (svgErr) {
+              console.warn('Could not rasterize vector SVG for PDF:', svgErr);
+            }
+          } else if (img.imageUrl.startsWith('data:image/png')) {
+            const base64Data = img.imageUrl.split(',')[1];
+            const binaryString = atob(base64Data);
+            const bytes = new Uint8Array(binaryString.length);
+            for (let i = 0; i < binaryString.length; i++) {
+              bytes[i] = binaryString.charCodeAt(i);
+            }
+            pdfImg = await pdfDoc.embedPng(bytes);
+          } else if (img.imageUrl.startsWith('data:image/jpeg') || img.imageUrl.startsWith('data:image/jpg')) {
+            const base64Data = img.imageUrl.split(',')[1];
+            const binaryString = atob(base64Data);
+            const bytes = new Uint8Array(binaryString.length);
+            for (let i = 0; i < binaryString.length; i++) {
+              bytes[i] = binaryString.charCodeAt(i);
+            }
+            pdfImg = await pdfDoc.embedJpg(bytes);
+          } else {
+            const imgRes = await fetch(img.imageUrl);
+            const imgBytes = await imgRes.arrayBuffer();
+            try {
+              pdfImg = await pdfDoc.embedPng(imgBytes);
+            } catch {
+              pdfImg = await pdfDoc.embedJpg(imgBytes);
+            }
+          }
+
+          if (pdfImg) {
+            const xPt = img.xMm * MM_TO_PT;
+            const yPt = (template.pageHeightMm - (img.yMm + img.heightMm)) * MM_TO_PT;
+            const widthPt = img.widthMm * MM_TO_PT;
+            const heightPt = img.heightMm * MM_TO_PT;
+
+            page.drawImage(pdfImg, {
+              x: xPt,
+              y: yPt,
+              width: widthPt,
+              height: heightPt
+            });
+
+            if (img.caption && img.caption.trim().length > 0 && !img.isMatrix) {
+              const captionYPt = (template.pageHeightMm - (img.yMm + img.heightMm + 4)) * MM_TO_PT;
+              page.drawText(img.caption, {
+                x: xPt + widthPt / 2 - 20,
+                y: captionYPt,
+                size: 9,
+                font: embeddedFont,
+                color: parseHexColor('#000000')
+              });
+            }
+          }
+        } catch (imgErr) {
+          console.warn('Could not embed image in PDF:', imgErr);
         }
       }
     }

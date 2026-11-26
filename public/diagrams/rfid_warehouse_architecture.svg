@@ -1,0 +1,81 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 680 460" width="680" height="460" style="background: transparent; font-family: 'Bad Script', 'Caveat', 'Patrick Hand', cursive, sans-serif;">
+  <defs>
+    <marker id="flow-arrow" viewBox="0 0 10 10" refX="6" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+      <path d="M 0 1.5 L 8 5 L 0 8.5 z" fill="#000000" />
+    </marker>
+    <filter id="ink-softness" x="-10%" y="-10%" width="120%" height="120%">
+      <feGaussianBlur stdDeviation="0.2" result="blur" />
+      <feMerge>
+        <feMergeNode in="blur" />
+        <feMergeNode in="SourceGraphic" />
+      </feMerge>
+    </filter>
+  </defs>
+  <!-- TIER 1 -->
+  <rect x="30" y="15" width="620" height="115" rx="6" fill="none" stroke="#000000" stroke-width="2" />
+  <text x="340" y="38" font-size="14" font-weight="700" fill="#000000" text-anchor="middle">TIER 1: PHYSICAL WAREHOUSE &amp; RFID LAYER</text>
+
+  <rect x="50" y="55" width="160" height="55" rx="4" fill="none" stroke="#000000" stroke-width="1.8" />
+  <text x="130" y="78" font-size="12" font-weight="600" fill="#000000" text-anchor="middle">Passive EPC Gen2</text>
+  <text x="130" y="96" font-size="11" fill="#000000" text-anchor="middle">Tags (860-960 MHz)</text>
+
+  <line x1="210" y1="82" x2="245" y2="82" stroke="#000000" stroke-width="1.8" marker-end="url(#flow-arrow)" />
+
+  <rect x="248" y="55" width="180" height="55" rx="4" fill="none" stroke="#000000" stroke-width="1.8" />
+  <text x="338" y="78" font-size="12" font-weight="600" fill="#000000" text-anchor="middle">UHF RFID Portal Reader</text>
+  <text x="338" y="96" font-size="11" fill="#000000" text-anchor="middle">(Bulk Read Capability)</text>
+
+  <line x1="428" y1="82" x2="465" y2="82" stroke="#000000" stroke-width="1.8" marker-end="url(#flow-arrow)" />
+
+  <rect x="468" y="55" width="160" height="55" rx="4" fill="none" stroke="#000000" stroke-width="1.8" />
+  <text x="548" y="78" font-size="12" font-weight="600" fill="#000000" text-anchor="middle">Dock Sensor</text>
+  <text x="548" y="96" font-size="11" fill="#000000" text-anchor="middle">(Direction: In / Out)</text>
+
+  <!-- Connect Tier 1 to Tier 2 -->
+  <line x1="338" y1="130" x2="338" y2="170" stroke="#000000" stroke-width="2" marker-end="url(#flow-arrow)" />
+  <text x="346" y="154" font-size="11" font-weight="600" fill="#000000">Raw EPC Burst Stream</text>
+
+  <!-- TIER 2 -->
+  <rect x="30" y="172" width="620" height="115" rx="6" fill="none" stroke="#000000" stroke-width="2" />
+  <text x="340" y="195" font-size="14" font-weight="700" fill="#000000" text-anchor="middle">TIER 2: RFID EDGE MIDDLEWARE LAYER</text>
+
+  <rect x="50" y="212" width="165" height="55" rx="4" fill="none" stroke="#000000" stroke-width="1.8" />
+  <text x="132" y="235" font-size="12" font-weight="600" fill="#000000" text-anchor="middle">Temporal Deduplication</text>
+  <text x="132" y="253" font-size="11" fill="#000000" text-anchor="middle">(Filter Multipath Echoes)</text>
+
+  <line x1="215" y1="240" x2="245" y2="240" stroke="#000000" stroke-width="1.8" marker-end="url(#flow-arrow)" />
+
+  <rect x="248" y="212" width="180" height="55" rx="4" fill="none" stroke="#000000" stroke-width="1.8" />
+  <text x="338" y="235" font-size="12" font-weight="600" fill="#000000" text-anchor="middle">EPC-to-SKU Resolver</text>
+  <text x="338" y="253" font-size="11" fill="#000000" text-anchor="middle">(Hex ➔ Product SKU)</text>
+
+  <line x1="428" y1="240" x2="465" y2="240" stroke="#000000" stroke-width="1.8" marker-end="url(#flow-arrow)" />
+
+  <rect x="468" y="212" width="160" height="55" rx="4" fill="none" stroke="#000000" stroke-width="1.8" />
+  <text x="548" y="235" font-size="12" font-weight="600" fill="#000000" text-anchor="middle">Real-Time Stock Ledger</text>
+  <text x="548" y="253" font-size="11" fill="#000000" text-anchor="middle">(Instant Level Sync)</text>
+
+  <!-- Connect Tier 2 to Tier 3 -->
+  <line x1="548" y1="287" x2="548" y2="325" stroke="#000000" stroke-width="2" marker-end="url(#flow-arrow)" />
+  <text x="440" y="310" font-size="11" font-weight="600" fill="#000000">Live Stock Updates</text>
+
+  <!-- TIER 3 -->
+  <rect x="30" y="327" width="620" height="115" rx="6" fill="none" stroke="#000000" stroke-width="2" />
+  <text x="340" y="350" font-size="14" font-weight="700" fill="#000000" text-anchor="middle">TIER 3: AI DEMAND FORECASTING &amp; ERP AUTOMATION</text>
+
+  <rect x="50" y="367" width="165" height="55" rx="4" fill="none" stroke="#000000" stroke-width="1.8" />
+  <text x="132" y="390" font-size="12" font-weight="600" fill="#000000" text-anchor="middle">Historical Sales Store</text>
+  <text x="132" y="408" font-size="11" fill="#000000" text-anchor="middle">(Demand Time-Series)</text>
+
+  <line x1="215" y1="395" x2="245" y2="395" stroke="#000000" stroke-width="1.8" marker-end="url(#flow-arrow)" />
+
+  <rect x="248" y="367" width="180" height="55" rx="4" fill="none" stroke="#000000" stroke-width="1.8" />
+  <text x="338" y="390" font-size="12" font-weight="600" fill="#000000" text-anchor="middle">AI Demand Forecaster</text>
+  <text x="338" y="408" font-size="11" fill="#000000" text-anchor="middle">(Trend + Seasonality)</text>
+
+  <line x1="428" y1="395" x2="465" y2="395" stroke="#000000" stroke-width="1.8" marker-end="url(#flow-arrow)" />
+
+  <rect x="468" y="367" width="160" height="55" rx="4" fill="none" stroke="#000000" stroke-width="1.8" />
+  <text x="548" y="390" font-size="12" font-weight="600" fill="#000000" text-anchor="middle">Dynamic ROP &amp; PO</text>
+  <text x="548" y="408" font-size="11" fill="#000000" text-anchor="middle">(Autonomous Restock)</text>
+</svg>

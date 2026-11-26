@@ -23,7 +23,7 @@ export interface TemplateConfig {
   isDefault?: boolean;
 }
 
-export type BlockType = 'question' | 'answer' | 'heading' | 'normal' | 'table';
+export type BlockType = 'question' | 'answer' | 'heading' | 'normal' | 'table' | 'image';
 export type TextAlignment = 'left' | 'center' | 'right';
 
 export interface TableRowData {
@@ -52,6 +52,15 @@ export interface DocumentBlock {
   alignment?: TextAlignment; // 'left' | 'center' | 'right'
   fontSizePt?: number; // Custom font size in pt (Word-style per-line/block formatting)
   tableData?: TableData; // Present if type === 'table'
+  imageUrl?: string; // Present if type === 'image' or diagram
+  originalImageUrl?: string; // Unprocessed original image if background was removed
+  isTransparentBg?: boolean; // Whether white background was removed leaving only text
+  imageWidthMm?: number;
+  imageHeightMm?: number;
+  diagramType?: string; // 'n_queens' | 'tsp' | 'astar' | 'query_tree' | 'computer_vision' | 'ordbms' | 'polyglot' | 'iiot' | 'rfid_warehouse' | 'matrix' | 'ascii'
+  rawDiagramLines?: string[];
+  caption?: string;
+  svgContent?: string;
 }
 
 export interface LayoutLine {
@@ -107,10 +116,25 @@ export interface LayoutTable {
   fontSizePt: number;
 }
 
+export interface LayoutImage {
+  id: string;
+  blockId: string;
+  pageIndex: number;
+  xMm: number;
+  yMm: number;
+  widthMm: number;
+  heightMm: number;
+  imageUrl: string;
+  svgContent?: string;
+  caption?: string;
+  isMatrix?: boolean;
+}
+
 export interface LayoutPage {
   pageIndex: number;
   lines: LayoutLine[];
   tables?: LayoutTable[];
+  images?: LayoutImage[];
 }
 
 export interface LayoutResult {

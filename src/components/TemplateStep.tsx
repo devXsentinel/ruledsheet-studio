@@ -200,6 +200,14 @@ export const TemplateStep: React.FC<Props> = ({
         </span>
       </div>
 
+      {/* Sticky Mobile Proceed Button */}
+      <div className="mobile-bottom-action-bar show-on-mobile">
+        <button onClick={onNext} className="btn btn-primary btn-lg" style={{ width: '100%', justifyContent: 'center' }}>
+          <span>Continue to Document Import</span>
+          <ArrowRight size={18} />
+        </button>
+      </div>
+
     </div>
   );
 };
